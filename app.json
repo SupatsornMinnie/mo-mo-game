@@ -3,7 +3,7 @@
     "name": "mo-mo-game",
     "slug": "mo-mo-game",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "momogame",
     "userInterfaceStyle": "automatic",
