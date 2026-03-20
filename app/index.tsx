@@ -1,12 +1,8 @@
 import React, { useEffect } from 'react';
 import {
   View,
-  StyleSheet,
-  Dimensions,
   Image,
-  TouchableOpacity,
   ImageBackground,
-  Text,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -17,10 +13,8 @@ import Animated, {
   withDelay,
   withSpring,
   Easing,
-  BounceIn,
 } from 'react-native-reanimated';
-
-const { width: SW, height: SH } = Dimensions.get('window');
+import { splashStyles as styles, SW, SH } from './styles/splash.styles';
 
 // ===== 9 CHARACTERS (1.png - 9.png) =====
 const CHARACTERS = [
@@ -71,13 +65,10 @@ function BouncingCharacter({
   const pop = useSharedValue(0);
 
   useEffect(() => {
-    // Pop entrance
     pop.value = withDelay(
       200 + index * 120,
       withSpring(1, { damping: 5, stiffness: 110 })
     );
-
-    // Bounce up and down
     bounce.value = withDelay(
       400 + index * 120,
       withRepeat(
@@ -95,8 +86,6 @@ function BouncingCharacter({
         false
       )
     );
-
-    // Wiggle rotation
     wiggle.value = withDelay(
       500 + index * 150,
       withRepeat(
@@ -158,13 +147,10 @@ function TitleLetter({
   const float = useSharedValue(0);
 
   useEffect(() => {
-    // Pop-in
     pop.value = withDelay(
       delay,
       withSpring(1, { damping: 4, stiffness: 100 })
     );
-
-    // Gentle float
     float.value = withDelay(
       delay + 300,
       withRepeat(
@@ -195,60 +181,6 @@ function TitleLetter({
         style={{ width: size, height: size }}
         resizeMode="contain"
       />
-    </Animated.View>
-  );
-}
-
-// ===== PLAY BUTTON =====
-function PlayButton() {
-  const pulse = useSharedValue(1);
-  const glow = useSharedValue(0.3);
-
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-    glow.value = withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 1000 }),
-        withTiming(0.25, { duration: 1000 })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value,
-  }));
-
-  return (
-    <Animated.View
-      entering={BounceIn.delay(1500).duration(700)}
-      style={styles.playWrap}
-    >
-      <Animated.View style={[styles.playGlow, glowStyle]} />
-      <Animated.View style={pulseStyle}>
-        <TouchableOpacity
-          style={styles.playBtn}
-          activeOpacity={0.8}
-          onPress={() => console.log('Play!')}
-        >
-          <View style={styles.playTriangleWrap}>
-            <View style={styles.playTriangle} />
-          </View>
-          <Text style={styles.playText}>PLAY</Text>
-        </TouchableOpacity>
-      </Animated.View>
     </Animated.View>
   );
 }
@@ -306,9 +238,8 @@ function Bubble({ x, size, delay }: { x: number; size: number; delay: number }) 
   );
 }
 
-// ===== MAIN SCREEN =====
-export default function HomeScreen() {
-  // 9 characters positioned in landscape: bottom area, spread left to right
+// ===== SPLASH SCREEN =====
+export default function SplashScreen() {
   const charSize = Math.min(SH * 0.28, SW * 0.1);
   const positions = CHARACTERS.map((_, i) => ({
     x: (SW * 0.04) + (i * (SW * 0.103)),
@@ -342,9 +273,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ===== PLAY BUTTON ===== */}
-      <PlayButton />
-
       {/* ===== 9 CHARACTERS ===== */}
       {CHARACTERS.map((src, i) => (
         <BouncingCharacter
@@ -369,84 +297,3 @@ export default function HomeScreen() {
     </ImageBackground>
   );
 }
-
-// ===== STYLES =====
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#87CEEB',
-  },
-
-  // Title area - top center
-  titleArea: {
-    position: 'absolute',
-    top: SH * 0.03,
-    width: '100%',
-    alignItems: 'center',
-    zIndex: 30,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -2,
-  },
-
-  // Play button - center of screen
-  playWrap: {
-    position: 'absolute',
-    top: SH * 0.28,
-    alignSelf: 'center',
-    alignItems: 'center',
-    zIndex: 25,
-  },
-  playGlow: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#FFD700',
-    top: -10,
-  },
-  playBtn: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FF6B9D',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FF6B9D',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 4,
-    borderColor: '#FFF',
-  },
-  playTriangleWrap: {
-    marginLeft: 5,
-    marginBottom: 2,
-  },
-  playTriangle: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 24,
-    borderTopWidth: 16,
-    borderBottomWidth: 16,
-    borderLeftColor: '#FFF',
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  playText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-    marginTop: 2,
-  },
-});
