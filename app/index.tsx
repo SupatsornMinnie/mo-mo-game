@@ -5,7 +5,9 @@ import {
   ImageBackground,
   ActivityIndicator,
   useWindowDimensions,
+  Pressable,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -18,35 +20,35 @@ import Animated, {
 import { Asset } from 'expo-asset';
 import { Audio } from 'expo-av';
 
-// ===== รูปภาพทั้งหมด =====
-const BG_IMAGE = require('../assets/home/sea/sea.png');
+// ===== รูปภาพทั้งหมด (WebP — เล็กกว่า PNG 99%) =====
+const BG_IMAGE = require('../assets/home/sea/sea.webp');
 
 const CHARACTER_IMAGES = [
-  require('../assets/character/1.png'),
-  require('../assets/character/2.png'),
-  require('../assets/character/3.png'),
-  require('../assets/character/4.png'),
-  require('../assets/character/5.png'),
-  require('../assets/character/6.png'),
-  require('../assets/character/7.png'),
-  require('../assets/character/8.png'),
-  require('../assets/character/9.png'),
+  require('../assets/character/1.webp'),
+  require('../assets/character/2.webp'),
+  require('../assets/character/3.webp'),
+  require('../assets/character/4.webp'),
+  require('../assets/character/5.webp'),
+  require('../assets/character/6.webp'),
+  require('../assets/character/7.webp'),
+  require('../assets/character/8.webp'),
+  require('../assets/character/9.webp'),
 ];
 
 const TITLE_LETTERS = [
-  { key: 'M1', image: require('../assets/alphabet/M.png') },
-  { key: 'o1', image: require('../assets/alphabet/O.png') },
-  { key: 'M2', image: require('../assets/alphabet/M.png') },
-  { key: 'o2', image: require('../assets/alphabet/O.png') },
+  { key: 'M1', image: require('../assets/alphabet/M.webp') },
+  { key: 'o1', image: require('../assets/alphabet/O.webp') },
+  { key: 'M2', image: require('../assets/alphabet/M.webp') },
+  { key: 'o2', image: require('../assets/alphabet/O.webp') },
   { key: 'sp', image: null },
-  { key: 'A1', image: require('../assets/alphabet/A.png') },
-  { key: 'l',  image: require('../assets/alphabet/L.png') },
-  { key: 'p',  image: require('../assets/alphabet/P.png') },
-  { key: 'h',  image: require('../assets/alphabet/H.png') },
-  { key: 'a2', image: require('../assets/alphabet/A.png') },
-  { key: 'b',  image: require('../assets/alphabet/B.png') },
-  { key: 'e',  image: require('../assets/alphabet/E.png') },  // ← ถ้ายังดูเหมือน I บอกนะคะ จะเปลี่ยนไฟล์ภาพ
-  { key: 't',  image: require('../assets/alphabet/T.png') },
+  { key: 'A1', image: require('../assets/alphabet/A.webp') },
+  { key: 'l',  image: require('../assets/alphabet/L.webp') },
+  { key: 'p',  image: require('../assets/alphabet/P.webp') },
+  { key: 'h',  image: require('../assets/alphabet/H.webp') },
+  { key: 'a2', image: require('../assets/alphabet/A.webp') },
+  { key: 'b',  image: require('../assets/alphabet/B.webp') },
+  { key: 'e',  image: require('../assets/alphabet/E.webp') },
+  { key: 't',  image: require('../assets/alphabet/T.webp') },
 ];
 
 const BGM_SOUND = require('../assets/sounds/Alphabet_Ocean_Adventure.mp3');
@@ -142,45 +144,157 @@ function BouncingChar({ source, index, size, x, y: posY }: {
   );
 }
 
-// ===== ฟองอากาศ =====
-function Bubble({ x, size, delay, screenH }: {
-  x: number; size: number; delay: number; screenH: number;
+// ===== สีฟองสบู่ =====
+const BUBBLE_COLORS = [
+  { bg: 'rgba(173,216,230,0.45)', border: 'rgba(173,216,230,0.7)' },  // ฟ้าอ่อน
+  { bg: 'rgba(255,182,193,0.40)', border: 'rgba(255,182,193,0.65)' }, // ชมพู
+  { bg: 'rgba(144,238,144,0.40)', border: 'rgba(144,238,144,0.65)' }, // เขียวอ่อน
+  { bg: 'rgba(221,160,221,0.40)', border: 'rgba(221,160,221,0.65)' }, // ม่วงอ่อน
+  { bg: 'rgba(255,255,224,0.50)', border: 'rgba(255,255,200,0.7)' },  // เหลืองอ่อน
+  { bg: 'rgba(255,255,255,0.45)', border: 'rgba(255,255,255,0.65)' }, // ขาว
+];
+
+// ===== เศษฟองแตก (particle) — เป็นลูกของฟอง =====
+// ตอนนี้ particle เป็น child ของ bubble → ตำแหน่ง (0,0) = กลางฟอง
+function BubbleParticle({ angle, color, popTime, totalCycle, bubbleSize }: {
+  angle: number; color: string;
+  popTime: number; totalCycle: number; bubbleSize: number;
 }) {
-  const y = useSharedValue(screenH);
+  const progress = useSharedValue(0);
   const opacity = useSharedValue(0);
 
+  // กระจายออกจากกลางฟอง
+  const spread = bubbleSize * 1.5;
+  const dx = Math.cos(angle) * spread;
+  const dy = Math.sin(angle) * spread;
+
   useEffect(() => {
-    y.value = withDelay(delay,
-      withRepeat(withTiming(-30, { duration: 4000 + delay, easing: Easing.out(Easing.quad) }), -1, false)
-    );
-    opacity.value = withDelay(delay,
-      withRepeat(
+    const startParticle = () => {
+      progress.value = 0;
+      opacity.value = 0;
+      progress.value = withDelay(popTime,
+        withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) })
+      );
+      opacity.value = withDelay(popTime,
         withSequence(
-          withTiming(0.5, { duration: 800 }),
-          withTiming(0.5, { duration: 2200 }),
-          withTiming(0,   { duration: 1000 }),
-        ), -1, false
-      )
-    );
+          withTiming(0.9, { duration: 80 }),
+          withTiming(0, { duration: 320 }),
+        )
+      );
+      setTimeout(startParticle, totalCycle);
+    };
+    startParticle();
   }, []);
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: y.value }],
+    transform: [
+      { translateX: dx * progress.value },
+      { translateY: dy * progress.value },
+    ],
     opacity: opacity.value,
   }));
 
   return (
     <Animated.View style={[{
       position: 'absolute',
+      left: bubbleSize / 2 - 2,
+      top: bubbleSize / 2 - 2,
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: color,
+    }, style]} />
+  );
+}
+
+// ===== ฟองอากาศ + แตก + particle =====
+function PoppingBubble({ x, size, delay, screenH, colorIndex, heightRatio }: {
+  x: number; size: number; delay: number; screenH: number; colorIndex: number; heightRatio: number;
+}) {
+  const y = useSharedValue(0);
+  const bubbleOpacity = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const color = BUBBLE_COLORS[colorIndex % BUBBLE_COLORS.length];
+
+  const floatDistance = screenH * heightRatio;
+  const floatDuration = 2000 + (heightRatio * 3000);
+  const popAt = floatDuration - 200;
+  const totalCycle = floatDuration + 500;
+
+  useEffect(() => {
+    const startCycle = () => {
+      y.value = 0;
+      bubbleOpacity.value = 0;
+      scale.value = 1;
+
+      // ลอยขึ้น
+      y.value = withDelay(delay,
+        withTiming(-floatDistance, { duration: floatDuration, easing: Easing.out(Easing.quad) })
+      );
+      // ปรากฏ → ค้าง → แตก
+      bubbleOpacity.value = withDelay(delay,
+        withSequence(
+          withTiming(0.6, { duration: 600 }),
+          withTiming(0.55, { duration: popAt - 800 }),
+          withTiming(0, { duration: 200 }),
+        )
+      );
+      scale.value = withDelay(delay + popAt,
+        withTiming(1.5, { duration: 200, easing: Easing.out(Easing.quad) })
+      );
+
+      setTimeout(startCycle, delay + totalCycle);
+    };
+    startCycle();
+  }, []);
+
+  // ชั้นนอก: จัดการแค่ตำแหน่ง (translateY) — ไม่มี opacity
+  const positionStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: y.value }],
+  }));
+
+  // ชั้นใน: ฟองมี opacity + scale ของตัวเอง
+  const bubbleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: bubbleOpacity.value,
+  }));
+
+  const angles = [0, 1.26, 2.51, 3.77, 5.03];
+
+  return (
+    // ชั้นนอก — ควบคุมตำแหน่งอย่างเดียว (ไม่มี opacity)
+    <Animated.View style={[{
+      position: 'absolute',
       left: `${x}%`,
+      bottom: 0,
       width: size,
       height: size,
-      borderRadius: size / 2,
-      backgroundColor: 'rgba(255,255,255,0.45)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.65)',
       zIndex: 1,
-    }, style]} />
+      overflow: 'visible',
+    }, positionStyle]}>
+
+      {/* ฟอง — มี opacity ของตัวเอง */}
+      <Animated.View style={[{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color.bg,
+        borderWidth: 1,
+        borderColor: color.border,
+      }, bubbleStyle]} />
+
+      {/* particles — มี opacity แยกจากฟอง → เห็นตอนฟองหาย */}
+      {angles.map((angle, pi) => (
+        <BubbleParticle
+          key={`p-${pi}`}
+          angle={angle}
+          color={color.border}
+          popTime={delay + popAt}
+          totalCycle={delay + totalCycle}
+          bubbleSize={size}
+        />
+      ))}
+    </Animated.View>
   );
 }
 
@@ -188,23 +302,34 @@ function Bubble({ x, size, delay, screenH }: {
 export default function SplashScreen() {
   const [ready, setReady] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const hasNavigated = useRef(false);
+  const router = useRouter();
   const { width: sw, height: sh } = useWindowDimensions();
 
-  // Pre-load ภาพทั้งหมด + เล่นเพลง
+  // ฟังก์ชัน navigate ไป home (กันเรียกซ้ำ)
+  const goHome = useCallback(() => {
+    if (hasNavigated.current) return;
+    hasNavigated.current = true;
+    soundRef.current?.stopAsync();
+    soundRef.current?.unloadAsync();
+    router.replace('/home');
+  }, [router]);
+
+  // Pre-load: แสดงพื้นหลังก่อน → โหลดตัวละครทีหลัง
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
       try {
-        // โหลดภาพทั้งหมดก่อนแสดงผล
-        const allImages = [
-          BG_IMAGE,
+        // โหลดพื้นหลังก่อน แสดงจอได้เลย
+        await Asset.loadAsync([BG_IMAGE]);
+        if (mounted) setReady(true);
+
+        // แล้วค่อยโหลดตัวละคร + ตัวอักษร (background)
+        await Asset.loadAsync([
           ...CHARACTER_IMAGES,
           ...TITLE_LETTERS.filter(l => l.image).map(l => l.image),
-        ];
-        await Asset.loadAsync(allImages);
-
-        if (mounted) setReady(true);
+        ]);
 
         // เล่นเพลงพื้นหลัง
         await Audio.setAudioModeAsync({
@@ -213,10 +338,16 @@ export default function SplashScreen() {
         });
         const { sound } = await Audio.Sound.createAsync(
           BGM_SOUND,
-          { isLooping: true, volume: 0.5 }
+          { isLooping: false, volume: 0.5 }
         );
         if (mounted) {
           soundRef.current = sound;
+          // เมื่อเพลงจบ → ไป home
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              goHome();
+            }
+          });
           await sound.playAsync();
         } else {
           await sound.unloadAsync();
@@ -234,10 +365,11 @@ export default function SplashScreen() {
   // คำนวณขนาดและตำแหน่ง (responsive)
   const letterSize = Math.min(sw / 14, 70);
   const charSize = Math.min(sh * 0.22, sw * 0.1, 120);
+  const charSizes = [1.3, 1.2, 0.95, 0.95, 1.2, 0.80, 1.1, 0.85, 1.0];
   const positions = CHARACTER_IMAGES.map((_, i) => ({
     x: (sw * 0.04) + (i * (sw * 0.103)),
     y: sh * 0.63 + (i % 2 === 0 ? 0 : -sh * 0.05),
-    size: charSize + (i % 3 === 0 ? 6 : i % 3 === 1 ? -3 : 0),
+    size: charSize * charSizes[i],
   }));
 
   // หน้าจอ Loading
@@ -250,6 +382,7 @@ export default function SplashScreen() {
   }
 
   return (
+    <Pressable style={{ flex: 1 }} onPress={goHome}>
     <ImageBackground source={BG_IMAGE} style={{ flex: 1, backgroundColor: '#87CEEB' }} resizeMode="cover">
 
       {/* ===== TITLE: "MoMo Alphabet" ===== */}
@@ -284,10 +417,28 @@ export default function SplashScreen() {
         />
       ))}
 
-      {/* ===== BUBBLES ===== */}
-      {[12, 28, 45, 62, 78, 90, 35, 55].map((x, i) => (
-        <Bubble key={`b-${i}`} x={x} size={8 + (i % 4) * 4} delay={i * 1200} screenH={sh} />
+      {/* ===== BUBBLES (ลอยขึ้น + แตก + หลายสี + ความสูงสุ่ม) ===== */}
+      {[
+        { x: 5,  s: 10, d: 0,    h: 0.85 }, { x: 12, s: 14, d: 800,  h: 0.55 },
+        { x: 20, s: 8,  d: 1600, h: 0.70 }, { x: 28, s: 12, d: 400,  h: 0.90 },
+        { x: 35, s: 10, d: 2200, h: 0.45 }, { x: 42, s: 14, d: 1000, h: 0.75 },
+        { x: 50, s: 8,  d: 1800, h: 0.60 }, { x: 58, s: 12, d: 600,  h: 0.80 },
+        { x: 65, s: 10, d: 2400, h: 0.50 }, { x: 72, s: 14, d: 200,  h: 0.88 },
+        { x: 80, s: 8,  d: 1400, h: 0.65 }, { x: 88, s: 12, d: 2000, h: 0.42 },
+        { x: 95, s: 10, d: 1200, h: 0.78 }, { x: 15, s: 9,  d: 2600, h: 0.55 },
+        { x: 55, s: 11, d: 3000, h: 0.70 }, { x: 75, s: 13, d: 3400, h: 0.48 },
+      ].map((b, i) => (
+        <PoppingBubble
+          key={`b-${i}`}
+          x={b.x}
+          size={b.s}
+          delay={b.d}
+          screenH={sh}
+          colorIndex={i}
+          heightRatio={b.h}
+        />
       ))}
     </ImageBackground>
+    </Pressable>
   );
 }

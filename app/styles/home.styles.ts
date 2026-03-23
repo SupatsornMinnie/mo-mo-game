@@ -3,77 +3,38 @@ import { StyleSheet, Dimensions } from 'react-native';
 const { width: SW, height: SH } = Dimensions.get('window');
 
 export const homeStyles = StyleSheet.create({
-  // พื้นหลังเต็มจอ
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
   },
-
-  // กรอบตัวหนังสือ "MoMo Alphabet"
-  titleArea: {
+  background: {
+    flex: 1,
+  },
+  // My Bubble ไอคอนมุมขวาบน
+  myBubbleBtn: {
     position: 'absolute',
-    top: SH * 0.06,
-    width: '100%',
-    alignItems: 'center',
-    zIndex: 30,
-  },
-  titleRow: {
+    top: SH * 0.03,
+    right: SW * 0.03,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    zIndex: 100,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.9)',
   },
-
-  // ปุ่ม Play — กลางหน้าจอ
-  playWrap: {
-    position: 'absolute',
-    top: SH * 0.35,
-    alignSelf: 'center',
-    alignItems: 'center',
-    zIndex: 25,
-  },
-  playGlow: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#FFD700',
-    top: -10,
-  },
-  playBtn: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FF6B9D',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FF6B9D',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 4,
-    borderColor: '#FFF',
-  },
-  playTriangleWrap: {
-    marginLeft: 5,
-    marginBottom: 2,
-  },
-  playTriangle: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 24,
-    borderTopWidth: 16,
-    borderBottomWidth: 16,
-    borderLeftColor: '#FFF',
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  playText: {
-    color: '#FFF',
+  myBubbleText: {
+    color: '#4A90D9',
     fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  myBubbleCount: {
+    color: '#FF6B9D',
+    fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 2,
-    marginTop: 2,
+    marginLeft: 6,
   },
 });
 
