@@ -41,6 +41,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
   const letterY = APPLE_LETTERS.map((_, i) => useSharedValue(slotPositions[i].y));
   const letterOpacities = APPLE_LETTERS.map(() => useSharedValue(1));
   const letterScale = APPLE_LETTERS.map(() => useSharedValue(1));
+  const letterRotation = APPLE_LETTERS.map(() => useSharedValue(0)); // เริ่มตรง
 
   // Worm — อยู่นิ่งตำแหน่งสุ่ม
   const wormRandX = sw * 0.2 + Math.random() * (sw * 0.5);
@@ -91,7 +92,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
           withTiming(1, { duration: 60 })
         )
       );
-      // กระจายทันที (delay แค่ i*30 ให้ไล่กัน)
+      // กระจายทันที (delay แค่ i*30 ให้ไล่กัน) + เอียง
       letterX[i].value = withDelay(
         impactTime + i * 30,
         withSpring(scatterPositions[i].x, { damping: 10, stiffness: 120 })
@@ -99,6 +100,10 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
       letterY[i].value = withDelay(
         impactTime + i * 30,
         withSpring(scatterPositions[i].y, { damping: 10, stiffness: 120 })
+      );
+      letterRotation[i].value = withDelay(
+        impactTime + i * 30,
+        withSpring(scatterPositions[i].rotation || 0, { damping: 8, stiffness: 100 })
       );
     });
 
@@ -128,6 +133,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
             { translateX: letterX[i].value },
             { translateY: letterY[i].value },
             { scale: letterScale[i].value },
+            { rotate: `${letterRotation[i].value}deg` },
           ],
           opacity: letterOpacities[i].value,
         }));

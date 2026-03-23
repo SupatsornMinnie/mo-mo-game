@@ -75,32 +75,34 @@ export function calculateSlotPositions(sw: number, sh: number) {
   }));
 }
 
-/** Generate random scattered positions avoiding edges and slot area */
+/** Generate random scattered positions + rotation */
 export function generateScatterPositions(sw: number, sh: number) {
-  const slotSize = Math.min(sw * 0.08, sh * 0.18, 70);
-  const margin = slotSize;
-  const positions: { x: number; y: number }[] = [];
+  const actualSize = Math.min(sw * 0.18, sh * 0.25, 110); // ขนาดตัวอักษรจริง
+  const margin = actualSize * 1.2; // margin ใหญ่พอไม่ให้ตกขอบ
+  const positions: { x: number; y: number; rotation: number }[] = [];
 
   for (let i = 0; i < APPLE_LETTERS.length; i++) {
     let x: number, y: number;
     let tries = 0;
     do {
-      x = margin + Math.random() * (sw - 2 * margin - slotSize);
-      // กระจายทั่วจอ แต่หลีก slot area (sh*0.55-0.72) และ apple area (sh*0.10-0.40)
+      x = margin + Math.random() * (sw - 2 * margin);
+      // กระจายทั่วจอ แต่หลีก slot area (sh*0.55-0.72) และ apple area (sh*0.10-0.35)
       const zone = Math.random();
       if (zone < 0.4) {
-        y = sh * 0.08 + Math.random() * (sh * 0.30); // ส่วนบน (ใต้ timer)
+        y = sh * 0.10 + Math.random() * (sh * 0.25); // ส่วนบน (ใต้ timer)
       } else {
-        y = sh * 0.75 + Math.random() * (sh * 0.18); // ส่วนล่างสุด
+        y = sh * 0.75 + Math.random() * (sh * 0.15); // ส่วนล่างสุด
       }
       tries++;
     } while (
       tries < 20 &&
       positions.some(
-        (p) => Math.abs(p.x - x) < slotSize * 1.8 && Math.abs(p.y - y) < slotSize * 1.8
+        (p) => Math.abs(p.x - x) < actualSize * 1.5 && Math.abs(p.y - y) < actualSize * 1.5
       )
     );
-    positions.push({ x, y });
+    // สุ่มมุมเอียง -25 ถึง +25 องศา
+    const rotation = (Math.random() - 0.5) * 50;
+    positions.push({ x, y, rotation });
   }
   return positions;
 }

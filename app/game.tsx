@@ -286,6 +286,7 @@ export default function GameScreen() {
                 index={i}
                 scatterX={scatterPositions[i].x}
                 scatterY={scatterPositions[i].y}
+                scatterRotation={scatterPositions[i].rotation}
                 validTargets={validTargets}
                 size={letterSize}
                 isPlaced={placedLetters[i]}

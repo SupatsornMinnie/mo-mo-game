@@ -33,6 +33,7 @@ interface DraggableLetterProps {
   index: number;
   scatterX: number;
   scatterY: number;
+  scatterRotation?: number;
   /** All valid slot targets this letter can snap to (for duplicate letters like PP) */
   validTargets: SlotTarget[];
   size: number;
@@ -49,6 +50,7 @@ export default function DraggableLetter({
   index,
   scatterX,
   scatterY,
+  scatterRotation = 0,
   validTargets,
   size,
   isPlaced,
@@ -61,7 +63,7 @@ export default function DraggableLetter({
   const translateX = useSharedValue(scatterX);
   const translateY = useSharedValue(scatterY);
   const scale = useSharedValue(1);
-  const wiggle = useSharedValue(0);
+  const wiggle = useSharedValue(scatterRotation); // เอียงตั้งแต่เริ่ม
   const contextX = useSharedValue(0);
   const contextY = useSharedValue(0);
   const isDragging = useSharedValue(false);
