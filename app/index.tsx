@@ -1,13 +1,12 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   View,
   Image,
   ImageBackground,
-  ActivityIndicator,
   useWindowDimensions,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -17,7 +16,6 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import { Asset } from 'expo-asset';
 import { Audio } from 'expo-av';
 
 // ===== รูปภาพทั้งหมด (WebP — เล็กกว่า PNG 99%) =====
@@ -36,19 +34,27 @@ const CHARACTER_IMAGES = [
 ];
 
 const TITLE_LETTERS = [
-  { key: 'M1', image: require('../assets/alphabet/M.webp') },
-  { key: 'o1', image: require('../assets/alphabet/O.webp') },
-  { key: 'M2', image: require('../assets/alphabet/M.webp') },
-  { key: 'o2', image: require('../assets/alphabet/O.webp') },
-  { key: 'sp', image: null },
-  { key: 'A1', image: require('../assets/alphabet/A.webp') },
-  { key: 'l',  image: require('../assets/alphabet/L.webp') },
-  { key: 'p',  image: require('../assets/alphabet/P.webp') },
-  { key: 'h',  image: require('../assets/alphabet/H.webp') },
-  { key: 'a2', image: require('../assets/alphabet/A.webp') },
-  { key: 'b',  image: require('../assets/alphabet/B.webp') },
-  { key: 'e',  image: require('../assets/alphabet/E.webp') },
-  { key: 't',  image: require('../assets/alphabet/T.webp') },
+  { key: 'M1', image: require('../assets/alphabet/M/M.webp'), isA: false },
+  { key: 'o1', image: require('../assets/alphabet/O/O.webp'), isA: false },
+  { key: 'M2', image: require('../assets/alphabet/M/M.webp'), isA: false },
+  { key: 'o2', image: require('../assets/alphabet/O/O.webp'), isA: false },
+  { key: 'sp', image: null, isA: false },
+  { key: 'A1', image: require('../assets/alphabet/A/A.webp'), isA: true },
+  { key: 'l',  image: require('../assets/alphabet/L/L.webp'), isA: false },
+  { key: 'p',  image: require('../assets/alphabet/P/P.webp'), isA: false },
+  { key: 'h',  image: require('../assets/alphabet/H/H.webp'), isA: false },
+  { key: 'a2', image: require('../assets/alphabet/A/A.webp'), isA: true },
+  { key: 'b',  image: require('../assets/alphabet/B/B.webp'), isA: false },
+  { key: 'e',  image: require('../assets/alphabet/E/E.webp'), isA: false },
+  { key: 't',  image: require('../assets/alphabet/T/T.webp'), isA: false },
+];
+
+// Sprite frames for letter A (angel wings flapping)
+const A_SPRITE_FRAMES = [
+  require('../assets/alphabet/A/sprite_a1.webp'),
+  require('../assets/alphabet/A/sprite_a2.webp'),
+  require('../assets/alphabet/A/sprite_a3.webp'),
+  require('../assets/alphabet/A/sprite_a4.webp'),
 ];
 
 const BGM_SOUND = require('../assets/sounds/Alphabet_Ocean_Adventure.mp3');
@@ -80,6 +86,73 @@ function FloatingLetter({ source, index, size }: {
   return (
     <Animated.View style={[{ marginHorizontal: 1 }, style]}>
       <Image source={source} style={{ width: size, height: size }} resizeMode="contain" />
+    </Animated.View>
+  );
+}
+
+// ===== ตัว A กดแล้วปีกกระพือ (Sprite Animation) =====
+function SpriteLetterA({ index, size }: { index: number; size: number }) {
+  const [frameIndex, setFrameIndex] = useState(-1); // -1 = normal A
+  const animating = useRef(false);
+  const y = useSharedValue(0);
+
+  useEffect(() => {
+    y.value = withDelay(
+      index * 80,
+      withRepeat(
+        withSequence(
+          withTiming(-4, { duration: 900 + index * 60, easing: Easing.inOut(Easing.sin) }),
+          withTiming(4,  { duration: 900 + index * 60, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        true
+      )
+    );
+  }, []);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: y.value }],
+  }));
+
+  const handlePress = useCallback(() => {
+    if (animating.current) return;
+    animating.current = true;
+
+    // Cycle through 4 frames × 3 loops = 12 frames total
+    let frame = 0;
+    const totalFrames = 4 * 3; // 3 full wing flaps
+    const interval = setInterval(() => {
+      setFrameIndex(frame % 4);
+      frame++;
+      if (frame >= totalFrames) {
+        clearInterval(interval);
+        setFrameIndex(-1); // back to normal A
+        animating.current = false;
+      }
+    }, 100); // 100ms per frame
+  }, []);
+
+  const currentSource = frameIndex >= 0
+    ? A_SPRITE_FRAMES[frameIndex]
+    : TITLE_LETTERS.find(l => l.isA)!.image;
+
+  // Sprite frames are bigger (have wings) so use larger size
+  const displaySize = frameIndex >= 0 ? size * 2.2 : size;
+
+  return (
+    <Animated.View style={[{ marginHorizontal: 1 }, floatStyle]}>
+      <Pressable onPress={handlePress}>
+        <Image
+          source={currentSource}
+          style={{
+            width: displaySize,
+            height: displaySize,
+            marginHorizontal: frameIndex >= 0 ? -(displaySize - size) / 2 : 0,
+            marginVertical: frameIndex >= 0 ? -(displaySize - size) / 2 : 0,
+          }}
+          resizeMode="contain"
+        />
+      </Pressable>
     </Animated.View>
   );
 }
@@ -300,7 +373,6 @@ function PoppingBubble({ x, size, delay, screenH, colorIndex, heightRatio }: {
 
 // ===== หน้าจอหลัก =====
 export default function SplashScreen() {
-  const [ready, setReady] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const hasNavigated = useRef(false);
   const router = useRouter();
@@ -312,26 +384,21 @@ export default function SplashScreen() {
     hasNavigated.current = true;
     soundRef.current?.stopAsync();
     soundRef.current?.unloadAsync();
-    router.replace('/home');
+    // router.replace('/home');
+    router.replace('/game');  // ข้ามไปหน้า game ตรงๆ
   }, [router]);
 
-  // Pre-load: แสดงพื้นหลังก่อน → โหลดตัวละครทีหลัง
+  // === ข้ามไปหน้า game ตรงๆ ===
+  return <Redirect href="/game" />;
+
+  // เล่นเพลงพื้นหลัง (ไม่ต้อง pre-load รูปภาพ)
+  // === คอมเม้นไว้ก่อน ===
+  /*
   useEffect(() => {
     let mounted = true;
 
-    const init = async () => {
+    const playBGM = async () => {
       try {
-        // โหลดพื้นหลังก่อน แสดงจอได้เลย
-        await Asset.loadAsync([BG_IMAGE]);
-        if (mounted) setReady(true);
-
-        // แล้วค่อยโหลดตัวละคร + ตัวอักษร (background)
-        await Asset.loadAsync([
-          ...CHARACTER_IMAGES,
-          ...TITLE_LETTERS.filter(l => l.image).map(l => l.image),
-        ]);
-
-        // เล่นเพลงพื้นหลัง
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
           staysActiveInBackground: false,
@@ -342,7 +409,6 @@ export default function SplashScreen() {
         );
         if (mounted) {
           soundRef.current = sound;
-          // เมื่อเพลงจบ → ไป home
           sound.setOnPlaybackStatusUpdate((status) => {
             if (status.isLoaded && status.didJustFinish) {
               goHome();
@@ -353,14 +419,14 @@ export default function SplashScreen() {
           await sound.unloadAsync();
         }
       } catch (e) {
-        console.warn('Init error:', e);
-        if (mounted) setReady(true); // แสดงหน้าจอถึงแม้โหลดไม่ครบ
+        console.warn('BGM error:', e);
       }
     };
 
-    init();
+    playBGM();
     return () => { mounted = false; soundRef.current?.unloadAsync(); };
   }, []);
+  */
 
   // คำนวณขนาดและตำแหน่ง (responsive)
   const letterSize = Math.min(sw / 14, 70);
@@ -371,15 +437,6 @@ export default function SplashScreen() {
     y: sh * 0.63 + (i % 2 === 0 ? 0 : -sh * 0.05),
     size: charSize * charSizes[i],
   }));
-
-  // หน้าจอ Loading
-  if (!ready) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#87CEEB', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
 
   return (
     <Pressable style={{ flex: 1 }} onPress={goHome}>
@@ -397,6 +454,9 @@ export default function SplashScreen() {
           {TITLE_LETTERS.map((l, i) => {
             if (l.image === null) {
               return <View key={l.key} style={{ width: sw * 0.02 }} />;
+            }
+            if (l.isA) {
+              return <SpriteLetterA key={l.key} index={i} size={letterSize} />;
             }
             return (
               <FloatingLetter key={l.key} source={l.image} index={i} size={letterSize} />

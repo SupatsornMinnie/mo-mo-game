@@ -1,48 +1,93 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { View, Text, ImageBackground, useWindowDimensions, Pressable } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useRouter } from 'expo-router';
-import { Audio } from 'expo-av';
-import SeaCreature from '../components/SeaCreature';
-import VocabBubble, { BubbleInfo } from '../components/VocabBubble';
-import { homeStyles } from './styles/home.styles';
+import { Audio } from "expo-av";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef } from "react";
+import {
+  ImageBackground,
+  Pressable,
+  Text,
+  useWindowDimensions,
+} from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import SeaCreature from "../components/SeaCreature";
+import VocabBubble, { BubbleInfo } from "../components/VocabBubble";
+import { homeStyles } from "./styles/home.styles";
 
 // ===== ภาพ =====
-const BG_HOME = require('../assets/home/bg1.jpg');
-const WHALE = require('../assets/home/blue_whale.webp');
-const JELLY1 = require('../assets/home/jelly_fish_1.webp');
-const JELLY2 = require('../assets/home/jelly_fish_2.webp');
-const JELLY3 = require('../assets/home/jelly_fish_3.webp');
-const CRAB = require('../assets/home/crab.webp');
+const BG_HOME = require("../assets/home/bg1.jpg");
+const WHALE = require("../assets/home/blue_whale.webp");
+const JELLY1 = require("../assets/home/jelly_fish_1.webp");
+const JELLY2 = require("../assets/home/jelly_fish_2.webp");
+const JELLY3 = require("../assets/home/jelly_fish_3.webp");
+const CRAB = require("../assets/home/crab.webp");
 
 // ===== เสียง =====
-const BGM = require('../assets/sounds/Abyssal_Lullaby.mp3');
-const SFX_BREAK = require('../assets/sounds/bubble_break.wav');
-const SFX_LOCK = require('../assets/sounds/bubble_lock.wav');
-const SFX_BOUNCE = require('../assets/sounds/bubble-bounce.wav');
+const BGM = require("../assets/sounds/Abyssal_Lullaby.mp3");
+const SFX_BREAK = require("../assets/sounds/bubble_break.wav");
+const SFX_LOCK = require("../assets/sounds/bubble_lock.wav");
+const SFX_BOUNCE = require("../assets/sounds/bubble-bounce.wav");
 
 // ===== Bubble ว่าง =====
 const EMPTY_BUBBLES = [
-  require('../assets/bubble/bubble_1.webp'),
-  require('../assets/bubble/bubble_2.webp'),
-  require('../assets/bubble/bubble_3.webp'),
-  require('../assets/bubble/bubble_4.webp'),
-  require('../assets/bubble/bubble_5.webp'),
-  require('../assets/bubble/bubble_6.webp'),
-  require('../assets/bubble/bubble_7.webp'),
-  require('../assets/bubble/bubble_8.webp'),
+  require("../assets/bubble/bubble_1.webp"),
+  require("../assets/bubble/bubble_2.webp"),
+  require("../assets/bubble/bubble_3.webp"),
+  require("../assets/bubble/bubble_4.webp"),
+  require("../assets/bubble/bubble_5.webp"),
+  require("../assets/bubble/bubble_6.webp"),
+  require("../assets/bubble/bubble_7.webp"),
+  require("../assets/bubble/bubble_8.webp"),
 ];
 
 // ===== Vocabulary =====
 const VOCAB_BUBBLES = [
-  { id: 1, word: 'Apple',    image: require('../assets/vocabulary/1apple/bubble_apple.webp'),    locked: false },
-  { id: 2, word: 'Ant',      image: require('../assets/vocabulary/2ant/bubble_ant.webp'),        locked: false },
-  { id: 3, word: 'Actor',    image: require('../assets/vocabulary/3actor/bubble_actor.webp'),    locked: false },
-  { id: 4, word: 'Airplane', image: require('../assets/vocabulary/4airplan/bubble_airplan.webp'), locked: false },
-  { id: 5, word: 'Banana',   image: require('../assets/vocabulary/5banana/bubble_banana.webp'),  locked: true },
-  { id: 6, word: 'Bird',     image: require('../assets/vocabulary/6bird/bubble_bird.webp'),      locked: true },
-  { id: 7, word: 'Baker',    image: require('../assets/vocabulary/7baker/bubble_baker.webp'),    locked: true },
-  { id: 8, word: 'Ball',     image: require('../assets/vocabulary/8ball/bubble_ball.webp'),      locked: true },
+  {
+    id: 1,
+    word: "Apple",
+    image: require("../assets/vocabulary/1apple/bubble_apple.webp"),
+    locked: false,
+  },
+  {
+    id: 2,
+    word: "Ant",
+    image: require("../assets/vocabulary/2ant/bubble_ant.webp"),
+    locked: false,
+  },
+  {
+    id: 3,
+    word: "Actor",
+    image: require("../assets/vocabulary/3actor/bubble_actor.webp"),
+    locked: false,
+  },
+  {
+    id: 4,
+    word: "Airplane",
+    image: require("../assets/vocabulary/4airplan/bubble_airplan.webp"),
+    locked: false,
+  },
+  {
+    id: 5,
+    word: "Banana",
+    image: require("../assets/vocabulary/5banana/bubble_banana.webp"),
+    locked: true,
+  },
+  {
+    id: 6,
+    word: "Bird",
+    image: require("../assets/vocabulary/6bird/bubble_bird.webp"),
+    locked: true,
+  },
+  {
+    id: 7,
+    word: "Baker",
+    image: require("../assets/vocabulary/7baker/bubble_baker.webp"),
+    locked: true,
+  },
+  {
+    id: 8,
+    word: "Ball",
+    image: require("../assets/vocabulary/8ball/bubble_ball.webp"),
+    locked: true,
+  },
 ];
 
 const EMPTY_COUNT = 20;
@@ -55,10 +100,14 @@ export default function HomeScreen() {
 
   // Bubble refs สำหรับ collision detection
   const emptyBubbleRefs = useRef<React.RefObject<BubbleInfo | null>[]>(
-    Array.from({ length: EMPTY_COUNT }, () => React.createRef<BubbleInfo | null>())
+    Array.from({ length: EMPTY_COUNT }, () =>
+      React.createRef<BubbleInfo | null>(),
+    ),
   );
   const vocabBubbleRefs = useRef<React.RefObject<BubbleInfo | null>[]>(
-    Array.from({ length: VOCAB_BUBBLES.length }, () => React.createRef<BubbleInfo | null>())
+    Array.from({ length: VOCAB_BUBBLES.length }, () =>
+      React.createRef<BubbleInfo | null>(),
+    ),
   );
 
   // === เล่นเพลงพื้นหลัง ===
@@ -81,7 +130,7 @@ export default function HomeScreen() {
           await sound.unloadAsync();
         }
       } catch (e) {
-        console.warn('BGM error:', e);
+        console.warn("BGM error:", e);
       }
     };
     startBGM();
@@ -92,11 +141,12 @@ export default function HomeScreen() {
   }, []);
 
   // === เล่นเสียง SFX ===
-  const playSound = useCallback(async (type: 'break' | 'lock' | 'bounce') => {
+  const playSound = useCallback(async (type: "break" | "lock" | "bounce") => {
     try {
-      const src = type === 'break' ? SFX_BREAK : type === 'lock' ? SFX_LOCK : SFX_BOUNCE;
+      const src =
+        type === "break" ? SFX_BREAK : type === "lock" ? SFX_LOCK : SFX_BOUNCE;
       // ปรับ volume ให้เท่ากัน (lock/bounce เบากว่า break ~6 เท่า)
-      const vol = type === 'break' ? 0.5 : type === 'lock' ? 1.0 : 1.0;
+      const vol = type === "break" ? 0.5 : type === "lock" ? 1.0 : 1.0;
       const { sound } = await Audio.Sound.createAsync(src, { volume: vol });
       await sound.playAsync();
       sound.setOnPlaybackStatusUpdate((status) => {
@@ -105,15 +155,19 @@ export default function HomeScreen() {
         }
       });
     } catch (e) {
-      console.warn('SFX error:', e);
+      console.warn("SFX error:", e);
     }
   }, []);
 
   // === Collision detection ===
   useEffect(() => {
     const checkCollisions = () => {
-      const allEmpty = emptyBubbleRefs.current.map(r => r.current).filter(Boolean) as BubbleInfo[];
-      const allVocab = vocabBubbleRefs.current.map(r => r.current).filter(Boolean) as BubbleInfo[];
+      const allEmpty = emptyBubbleRefs.current
+        .map((r) => r.current)
+        .filter(Boolean) as BubbleInfo[];
+      const allVocab = vocabBubbleRefs.current
+        .map((r) => r.current)
+        .filter(Boolean) as BubbleInfo[];
 
       // empty vs empty
       for (let i = 0; i < allEmpty.length; i++) {
@@ -123,7 +177,7 @@ export default function HomeScreen() {
           if (!a.alive || !b.alive) continue;
           const dist = Math.sqrt(
             Math.pow(a.x + a.size / 2 - b.x - b.size / 2, 2) +
-            Math.pow(a.y + a.size / 2 - b.y - b.size / 2, 2)
+              Math.pow(a.y + a.size / 2 - b.y - b.size / 2, 2),
           );
           if (dist < (a.size + b.size) * 0.35) {
             a.pop();
@@ -139,7 +193,7 @@ export default function HomeScreen() {
           if (!vocab.alive) continue;
           const dist = Math.sqrt(
             Math.pow(empty.x + empty.size / 2 - vocab.x - vocab.size / 2, 2) +
-            Math.pow(empty.y + empty.size / 2 - vocab.y - vocab.size / 2, 2)
+              Math.pow(empty.y + empty.size / 2 - vocab.y - vocab.size / 2, 2),
           );
           if (dist < (empty.size + vocab.size) * 0.35) {
             empty.pop();
@@ -153,29 +207,67 @@ export default function HomeScreen() {
   }, []);
 
   // สัตว์ทะเล
-  const whaleSize = Math.min(sw * 0.30, 320);
+  const whaleSize = Math.min(sw * 0.3, 320);
   const jellyBigSize = Math.min(sw * 0.13, 150);
-  const jellyMedSize = Math.min(sw * 0.10, 120);
+  const jellyMedSize = Math.min(sw * 0.1, 120);
   const jellySmSize = Math.min(sw * 0.08, 95);
   const crabSize = Math.min(sw * 0.09, 100);
 
   const creatures = [
-    { source: WHALE,  x: sw * 0.58, y: sh * 0.02, size: whaleSize,    floatAmount: 10, floatDuration: 3000 },
-    { source: JELLY1, x: sw * 0.33, y: sh * 0.05, size: jellyBigSize, floatAmount: 12, floatDuration: 2500 },
-    { source: JELLY2, x: sw * 0.42, y: sh * 0.18, size: jellyMedSize, floatAmount: 10, floatDuration: 2800 },
-    { source: JELLY3, x: sw * 0.28, y: sh * 0.28, size: jellySmSize,  floatAmount: 8,  floatDuration: 2200 },
-    { source: CRAB,   x: sw * 0.58, y: sh * 0.68, size: crabSize,     floatAmount: 2,  floatDuration: 1500 },
+    {
+      source: WHALE,
+      x: sw * 0.58,
+      y: sh * -0.18,
+      size: whaleSize,
+      floatAmount: 10,
+      floatDuration: 3000,
+    },
+    {
+      source: JELLY1,
+      x: sw * 0.33,
+      y: sh * 0.05,
+      size: jellyBigSize,
+      floatAmount: 12,
+      floatDuration: 2500,
+    },
+    {
+      source: JELLY2,
+      x: sw * 0.42,
+      y: sh * 0.18,
+      size: jellyMedSize,
+      floatAmount: 10,
+      floatDuration: 2800,
+    },
+    {
+      source: JELLY3,
+      x: sw * 0.28,
+      y: sh * 0.28,
+      size: jellySmSize,
+      floatAmount: 8,
+      floatDuration: 2200,
+    },
+    {
+      source: CRAB,
+      x: sw * 0.58,
+      y: sh * 0.68,
+      size: crabSize,
+      floatAmount: 2,
+      floatDuration: 1500,
+    },
   ];
 
-  const handleVocabPop = useCallback((vocab: typeof VOCAB_BUBBLES[0]) => {
-    router.push({
-      pathname: '/game',
-      params: { word: vocab.word, id: String(vocab.id) },
-    });
-  }, [router]);
+  const handleVocabPop = useCallback(
+    (vocab: (typeof VOCAB_BUBBLES)[0]) => {
+      router.push({
+        pathname: "/game",
+        params: { word: vocab.word, id: String(vocab.id) },
+      });
+    },
+    [router],
+  );
 
   const handleMyBubble = useCallback(() => {
-    playSound('bounce');
+    playSound("bounce");
   }, []);
 
   return (
@@ -212,7 +304,11 @@ export default function HomeScreen() {
             onPlaySound={(t) => playSound(t)}
             minSize={sw * 0.03}
             maxSize={sw * 0.12}
-            bubbleRef={emptyBubbleRefs.current[i] as React.MutableRefObject<BubbleInfo | null>}
+            bubbleRef={
+              emptyBubbleRefs.current[
+                i
+              ] as React.MutableRefObject<BubbleInfo | null>
+            }
           />
         ))}
 
@@ -230,7 +326,11 @@ export default function HomeScreen() {
             onPlaySound={(t) => playSound(t)}
             minSize={sw * 0.11}
             maxSize={sw * 0.18}
-            bubbleRef={vocabBubbleRefs.current[i] as React.MutableRefObject<BubbleInfo | null>}
+            bubbleRef={
+              vocabBubbleRefs.current[
+                i
+              ] as React.MutableRefObject<BubbleInfo | null>
+            }
           />
         ))}
 
@@ -240,7 +340,6 @@ export default function HomeScreen() {
           <Text style={homeStyles.myBubbleText}>My Bubble</Text>
           <Text style={homeStyles.myBubbleCount}>0</Text>
         </Pressable>
-
       </ImageBackground>
     </GestureHandlerRootView>
   );
