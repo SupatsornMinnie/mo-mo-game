@@ -12,7 +12,7 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { LETTER_IMAGES, SNAP_THRESHOLD } from '../../utils/gameConfig';
+import { LETTER_IMAGES, SNAP_THRESHOLD, APPLE_LETTERS } from '../../utils/gameConfig';
 
 // Sprite frames สำหรับตัว A (ปีกกระพือ)
 const A_SPRITE_FRAMES = [
@@ -34,8 +34,8 @@ interface DraggableLetterProps {
   scatterX: number;
   scatterY: number;
   scatterRotation?: number;
-  /** All valid slot targets this letter can snap to (for duplicate letters like PP) */
   validTargets: SlotTarget[];
+  slotPositions?: { x: number; y: number; size: number }[];
   size: number;
   isPlaced: boolean;
   placedX?: number;
@@ -43,6 +43,7 @@ interface DraggableLetterProps {
   onPlace: (letterIndex: number, slotIndex: number) => void;
   onWrongPlace: () => void;
   onTouch: (char: string) => void;
+  onTouchEnd?: () => void;
 }
 
 export default function DraggableLetter({
@@ -52,6 +53,7 @@ export default function DraggableLetter({
   scatterY,
   scatterRotation = 0,
   validTargets,
+  slotPositions,
   size,
   isPlaced,
   placedX,
@@ -59,6 +61,7 @@ export default function DraggableLetter({
   onPlace,
   onWrongPlace,
   onTouch,
+  onTouchEnd,
 }: DraggableLetterProps) {
   const translateX = useSharedValue(scatterX);
   const translateY = useSharedValue(scatterY);
@@ -87,18 +90,17 @@ export default function DraggableLetter({
   }, [isPlaced, placedX, placedY]);
 
   const handleTouch = () => {
-    onTouch(char);
+    onTouch(char); // ออกเสียงตัวอักษรทุกครั้งที่กด
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // ตัว A → เปลี่ยนเป็นปีกนางฟ้า 2 วินาที
     if (isLetterA && !spriteAnimating.current) {
       spriteAnimating.current = true;
-      setSpriteFrame(0); // เปลี่ยนเป็นตัว A มีปีกทันที
+      setSpriteFrame(0);
       let frame = 0;
       const interval = setInterval(() => {
         frame++;
         setSpriteFrame(frame % 4);
       }, 150);
-      // หยุดหลัง 2 วินาที
       setTimeout(() => {
         clearInterval(interval);
         setSpriteFrame(-1);
@@ -130,11 +132,17 @@ export default function DraggableLetter({
       onPlace(index, bestTarget.slotIndex);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      // Wrong — bounce back to scatter position
-      translateX.value = withSpring(scatterX, { damping: 8 });
-      translateY.value = withSpring(scatterY, { damping: 8 });
-      onWrongPlace();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // วางตรงไหนก็ได้ — อยู่ตรงที่วาง ไม่ bounce กลับ
+      // แค่แจ้ง wrong sound ถ้าอยู่ใกล้ slot แต่ไม่ถูกตัว
+      const nearAnySlot = APPLE_LETTERS.some((_, si) => {
+        const dx = translateX.value - (slotPositions?.[si]?.x || 0);
+        const dy = translateY.value - (slotPositions?.[si]?.y || 0);
+        return Math.sqrt(dx * dx + dy * dy) < SNAP_THRESHOLD * 2;
+      });
+      if (nearAnySlot) {
+        onWrongPlace();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     }
   };
 
@@ -164,6 +172,10 @@ export default function DraggableLetter({
       scale.value = withSpring(1);
       wiggle.value = withTiming(0, { duration: 200 });
       runOnJS(checkPlacement)();
+      if (onTouchEnd) runOnJS(onTouchEnd)();
+    })
+    .onFinalize(() => {
+      if (onTouchEnd) runOnJS(onTouchEnd)();
     });
 
   const tapGesture = Gesture.Tap()
@@ -174,6 +186,9 @@ export default function DraggableLetter({
         withSpring(1.2, { damping: 4 }),
         withSpring(1, { damping: 6 })
       );
+    })
+    .onFinalize(() => {
+      if (onTouchEnd) runOnJS(onTouchEnd)();
     });
 
   const composedGesture = Gesture.Race(panGesture, tapGesture);
@@ -193,16 +208,9 @@ export default function DraggableLetter({
   const imgSource = isSpriting ? A_SPRITE_FRAMES[spriteFrame] : LETTER_IMAGES[char];
   const imgSize = isSpriting ? size * 1.8 : size * 0.9;
 
+  // ถ้า placed แล้ว → ซ่อนเลย (LetterSlot จะแสดงตัวอักษรจริงแทน)
   if (isPlaced) {
-    return (
-      <Animated.View style={[styles.letter, { width: size, height: size }, animStyle]}>
-        <Image
-          source={imgSource}
-          style={{ width: imgSize, height: imgSize }}
-          contentFit="contain"
-        />
-      </Animated.View>
-    );
+    return null;
   }
 
   return (

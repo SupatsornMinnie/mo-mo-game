@@ -51,11 +51,10 @@ export default function LetterSlot({ char, x, y, size, isFilled, isHighlighted }
           width: size,
           height: size,
           borderRadius: size * 0.15,
-          borderColor: isHighlighted ? '#FFD700' : 'rgba(255,255,255,0.4)',
-          borderWidth: isHighlighted ? 3 : 2,
-          backgroundColor: isFilled
-            ? 'rgba(144,238,144,0.3)' // green tint when filled
-            : 'rgba(255,255,255,0.15)',
+          // ถ้าเติมแล้ว ไม่มีกรอบ ไม่มีพื้นหลัง → ตัวอักษรเนียนเข้าไป
+          borderColor: isFilled ? 'transparent' : isHighlighted ? '#FFD700' : 'rgba(255,255,255,0.4)',
+          borderWidth: isFilled ? 0 : isHighlighted ? 3 : 2,
+          backgroundColor: isFilled ? 'transparent' : 'rgba(255,255,255,0.15)',
         },
         animStyle,
       ]}
@@ -64,7 +63,7 @@ export default function LetterSlot({ char, x, y, size, isFilled, isHighlighted }
         source={LETTER_IMAGES[char]}
         style={{ width: size * 0.8, height: size * 0.8 }}
         contentFit="contain"
-        // Faint shadow of the letter
+        // ถ้ายังไม่เติม → เงาจาง, ถ้าเติมแล้ว → แสดงตัวอักษรจริงเต็ม
         tintColor={isFilled ? undefined : 'rgba(255,255,255,0.5)'}
       />
     </Animated.View>

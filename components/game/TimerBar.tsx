@@ -17,9 +17,11 @@ interface TimerBarProps {
 
 export default function TimerBar({ progress, timeRemaining, isShaking }: TimerBarProps) {
   const shake = useSharedValue(0);
+  const isRed = progress <= 0.25;
 
+  // สั่นเฉพาะตอนสีแดง
   useEffect(() => {
-    if (isShaking) {
+    if (isShaking && isRed) {
       shake.value = withRepeat(
         withSequence(
           withTiming(4, { duration: 80 }),
@@ -31,7 +33,7 @@ export default function TimerBar({ progress, timeRemaining, isShaking }: TimerBa
     } else {
       shake.value = withTiming(0);
     }
-  }, [isShaking]);
+  }, [isShaking, isRed]);
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shake.value }],

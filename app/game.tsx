@@ -2,7 +2,8 @@ import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { View, Text, Pressable, ImageBackground, useWindowDimensions, ActivityIndicator, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 import { useAssetPreloader } from '../hooks/useAssetPreloader';
 import { useGameSounds } from '../hooks/useGameSounds';
@@ -17,22 +18,23 @@ import {
 
 import LetterSlot from '../components/game/LetterSlot';
 import DraggableLetter from '../components/game/DraggableLetter';
-import DraggableApplePiece from '../components/game/DraggableApplePiece';
+// DraggableApplePiece removed — worm drags directly to apple
 import TimerBar from '../components/game/TimerBar';
 import WormCharacter from '../components/game/WormCharacter';
 import AppleDrop from '../components/game/AppleDrop';
 import HintButton from '../components/game/HintButton';
 import CountdownNumber from '../components/game/CountdownNumber';
 import GameOverlay from '../components/game/GameOverlay';
+import CelebrationOverlay from '../components/game/CelebrationOverlay';
 
-type GamePhase = 'loading' | 'intro' | 'playing' | 'victory' | 'timeup';
+type GamePhase = 'loading' | 'intro' | 'playing' | 'celebration' | 'victory' | 'timeup';
 
 export default function GameScreen() {
   const router = useRouter();
   const { word, id } = useLocalSearchParams<{ word: string; id: string }>();
   const { width: sw, height: sh } = useWindowDimensions();
   const { loaded } = useAssetPreloader();
-  const { playLetterSound, playWordSound, playSFX } = useGameSounds();
+  const { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, playWordThenWin } = useGameSounds();
 
   // Game state
   const [phase, setPhase] = useState<GamePhase>('loading');
@@ -47,9 +49,7 @@ export default function GameScreen() {
   const [filledSlots, setFilledSlots] = useState<boolean[]>(
     APPLE_LETTERS.map(() => false)
   );
-  const [wormCaught, setWormCaught] = useState(false);
   const [applePieceReturned, setApplePieceReturned] = useState(false);
-  const [wormLastPos, setWormLastPos] = useState({ x: sw * 0.7, y: sh * 0.7 });
   const [wormInitPos, setWormInitPos] = useState<{ x: number; y: number } | null>(null);
   const [freeHints, setFreeHints] = useState(HINT_FREE_COUNT);
   const [highlightedSlot, setHighlightedSlot] = useState<number | null>(null);
@@ -60,6 +60,35 @@ export default function GameScreen() {
 
   // Positions
   const slotPositions = useMemo(() => calculateSlotPositions(sw, sh), [sw, sh]);
+
+  // แอปเปิ้ลลากได้
+  const appleTransX = useSharedValue(0);
+  const appleTransY = useSharedValue(0);
+  const appleCtxX = useSharedValue(0);
+  const appleCtxY = useSharedValue(0);
+  const appleScale = useSharedValue(1);
+
+  const applePanGesture = useMemo(() => Gesture.Pan()
+    .onStart(() => {
+      appleCtxX.value = appleTransX.value;
+      appleCtxY.value = appleTransY.value;
+      appleScale.value = withSpring(1.1);
+    })
+    .onUpdate((e) => {
+      appleTransX.value = appleCtxX.value + e.translationX;
+      appleTransY.value = appleCtxY.value + e.translationY;
+    })
+    .onEnd(() => {
+      appleScale.value = withSpring(1);
+    }), []);
+
+  const appleAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: appleTransX.value },
+      { translateY: appleTransY.value },
+      { scale: appleScale.value },
+    ],
+  }));
   const [scatterPositions, setScatterPositions] = useState(() =>
     generateScatterPositions(sw, sh)
   );
@@ -77,20 +106,29 @@ export default function GameScreen() {
       },
       onTimeUp: () => {
         setPhase('timeup');
+        stopBGM();
+        playSFX('lose');
       },
     }),
-    []
+    [stopBGM, playSFX]
   );
 
   const { timeRemaining, progress, start: startTimer, reset: resetTimer } =
     useGameTimer(timerCallbacks);
 
-  // Countdown effect (5, 4, 3, 2, 1)
+  // Countdown effect (5, 4, 3, 2, 1) + เสียง clock beep
+  const lastBeepRef = useRef(0);
   useEffect(() => {
     if (showCountdown && timeRemaining <= 5 && timeRemaining > 0) {
-      setCountdownNum(Math.ceil(timeRemaining));
+      const num = Math.ceil(timeRemaining);
+      setCountdownNum(num);
+      // เล่นเสียง beep ทุกวินาที (ไม่ซ้ำ)
+      if (num !== lastBeepRef.current) {
+        lastBeepRef.current = num;
+        playSFX('clockBeep');
+      }
     }
-  }, [showCountdown, timeRemaining]);
+  }, [showCountdown, timeRemaining, playSFX]);
 
   // Start game when assets loaded
   useEffect(() => {
@@ -104,16 +142,19 @@ export default function GameScreen() {
     if (phase !== 'playing') return;
     const allPlaced = placedLetters.every(Boolean);
     if (allPlaced && applePieceReturned) {
-      setPhase('victory');
-      playWordSound();
+      setPhase('celebration');
+      stopBGM(); // หยุดเพลงพื้นหลัง
+      playWordThenWin(); // เล่น "Apple" → รอจบ → เล่นเสียง win
+      setTimeout(() => setPhase('victory'), 3500);
     }
-  }, [placedLetters, applePieceReturned, phase]);
+  }, [placedLetters, applePieceReturned, phase, stopBGM, playWordThenWin]);
 
   // === Handlers ===
   const handleIntroComplete = useCallback(() => {
     setPhase('playing');
     startTimer();
-  }, [startTimer]);
+    startBGM();
+  }, [startTimer, startBGM]);
 
   const handleLetterPlace = useCallback(
     (letterIndex: number, slotIndex: number) => {
@@ -142,22 +183,29 @@ export default function GameScreen() {
     playSFX('wrong');
   }, [playSFX]);
 
+  const letterRepeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const handleLetterTouch = useCallback(
     (char: string) => {
+      // เล่นเสียงทันที + ซ้ำเรื่อยๆ ทุก 0.8 วินาที จนกว่าจะปล่อยมือ
+      if (letterRepeatRef.current) clearInterval(letterRepeatRef.current);
       playLetterSound(char);
+      letterRepeatRef.current = setInterval(() => {
+        playLetterSound(char);
+      }, 800);
     },
     [playLetterSound]
   );
 
+  const handleLetterTouchEnd = useCallback(() => {
+    if (letterRepeatRef.current) {
+      clearInterval(letterRepeatRef.current);
+      letterRepeatRef.current = null;
+    }
+  }, []);
+
   const handleWormPosition = useCallback((x: number, y: number) => {
     setWormInitPos({ x, y });
   }, []);
-
-  const handleWormCaught = useCallback((x?: number, y?: number) => {
-    playSFX('pop');
-    setWormCaught(true);
-    if (x != null && y != null) setWormLastPos({ x, y });
-  }, [playSFX]);
 
   const handleApplePieceReturn = useCallback(() => {
     playSFX('correct');
@@ -180,7 +228,6 @@ export default function GameScreen() {
     setPlacedLetters(APPLE_LETTERS.map(() => false));
     setLetterSlotMap(APPLE_LETTERS.map(() => -1));
     setFilledSlots(APPLE_LETTERS.map(() => false));
-    setWormCaught(false);
     setApplePieceReturned(false);
     setFreeHints(HINT_FREE_COUNT);
     setHighlightedSlot(null);
@@ -209,8 +256,8 @@ export default function GameScreen() {
   }
 
   const letterSize = slotPositions[0]?.size || 50;
-  // Apple size — ใหญ่ชัดเจน (ตรงกับ AppleDrop)
-  const appleDisplaySize = Math.min(Math.max(sw * 0.28, 100), sh * 0.28, 180);
+  // Apple size — ใหญ่ชัดเจน
+  const appleDisplaySize = Math.min(Math.max(sw * 0.35, 120), sh * 0.38, 230);
   // แอปเปิ้ลอยู่ส่วนบน ตัวอักษรอยู่ส่วนล่าง
   const appleTargetX = sw * 0.5;
   const appleTargetY = sh * 0.25;
@@ -227,45 +274,49 @@ export default function GameScreen() {
           <Text style={styles.backText}>{'←'}</Text>
         </Pressable>
 
-        {/* Timer Bar (only during playing) */}
-        {phase === 'playing' && (
-          <TimerBar
-            progress={progress}
-            timeRemaining={timeRemaining}
-            isShaking={isTimerShaking}
-          />
-        )}
-
-        {/* Intro Animation */}
-        {phase === 'intro' && (
-          <AppleDrop
-            sw={sw}
-            sh={sh}
-            scatterPositions={scatterPositions}
-            onIntroComplete={handleIntroComplete}
-            onWormPosition={handleWormPosition}
-          />
-        )}
-
-        {/* Letter Slots (shadows) — shown during playing */}
-        {phase === 'playing' &&
-          slotPositions.map((pos, i) => (
-            <LetterSlot
-              key={`slot-${i}`}
-              char={APPLE_LETTERS[i].char}
-              x={pos.x}
-              y={pos.y}
-              size={pos.size}
-              isFilled={filledSlots[i]}
-              isHighlighted={highlightedSlot === i}
+        {/* Timer Bar — pre-render แต่ซ่อนตอน intro */}
+        {(phase === 'intro' || phase === 'playing') && (
+          <View style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+            <TimerBar
+              progress={progress}
+              timeRemaining={timeRemaining}
+              isShaking={isTimerShaking}
             />
+          </View>
+        )}
+
+        {/* Intro Animation — เก็บไว้ตอน playing ชั่วครู่เพื่อไม่ให้กระตุก */}
+        {(phase === 'intro' || phase === 'playing') && (
+          <View style={{ opacity: phase === 'intro' ? 1 : 0 }} pointerEvents="none">
+            <AppleDrop
+              sw={sw}
+              sh={sh}
+              scatterPositions={scatterPositions}
+              onIntroComplete={handleIntroComplete}
+              onWormPosition={handleWormPosition}
+            />
+          </View>
+        )}
+
+        {/* Letter Slots (shadows) — pre-render แต่ซ่อนตอน intro */}
+        {(phase === 'intro' || phase === 'playing') &&
+          slotPositions.map((pos, i) => (
+            <View key={`slot-${i}`} style={{ opacity: phase === 'playing' ? 1 : 0 }}>
+              <LetterSlot
+                char={APPLE_LETTERS[i].char}
+                x={pos.x}
+                y={pos.y}
+                size={pos.size}
+                isFilled={filledSlots[i]}
+                isHighlighted={highlightedSlot === i}
+              />
+            </View>
           ))}
 
-        {/* Draggable Letters — shown during playing */}
-        {phase === 'playing' &&
+        {/* Draggable Letters — pre-render ซ่อนตอน intro */}
+        {(phase === 'intro' || phase === 'playing') &&
           APPLE_LETTERS.map((letter, i) => {
-            // Build valid targets: all unfilled slots with same base char (P and P2 share 'P')
-            const baseChar = letter.char.replace(/\d+$/, ''); // P2 → P
+            const baseChar = letter.char.replace(/\d+$/, '');
             const validTargets = APPLE_LETTERS
               .map((sl, si) => ({ sl, si }))
               .filter(({ sl, si }) => {
@@ -280,69 +331,67 @@ export default function GameScreen() {
 
             const placedSlot = letterSlotMap[i];
             return (
-              <DraggableLetter
-                key={`letter-${i}`}
-                char={letter.char}
-                index={i}
-                scatterX={scatterPositions[i].x}
-                scatterY={scatterPositions[i].y}
-                scatterRotation={scatterPositions[i].rotation}
-                validTargets={validTargets}
-                size={letterSize}
-                isPlaced={placedLetters[i]}
-                placedX={placedSlot >= 0 ? slotPositions[placedSlot].x : undefined}
-                placedY={placedSlot >= 0 ? slotPositions[placedSlot].y : undefined}
-                onPlace={handleLetterPlace}
-                onWrongPlace={handleWrongPlace}
-                onTouch={handleLetterTouch}
-              />
+              <View key={`letter-${i}`} style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+                <DraggableLetter
+                  char={letter.char}
+                  index={i}
+                  scatterX={scatterPositions[i].x}
+                  scatterY={scatterPositions[i].y}
+                  scatterRotation={scatterPositions[i].rotation}
+                  validTargets={validTargets}
+                  slotPositions={slotPositions}
+                  size={letterSize}
+                  isPlaced={placedLetters[i]}
+                  placedX={placedSlot >= 0 ? slotPositions[placedSlot].x : undefined}
+                  placedY={placedSlot >= 0 ? slotPositions[placedSlot].y : undefined}
+                  onPlace={handleLetterPlace}
+                  onWrongPlace={handleWrongPlace}
+                  onTouch={handleLetterTouch}
+                  onTouchEnd={handleLetterTouchEnd}
+                />
+              </View>
             );
           })}
 
-        {/* Bitten Apple — stays at center during gameplay */}
-        {phase === 'playing' && (
-          <View style={[styles.bittenApple, {
-            left: appleTargetX - appleDisplaySize / 2,
-            top: appleTargetY - appleDisplaySize / 2,
-            width: appleDisplaySize,
-            height: appleDisplaySize,
-            borderRadius: appleDisplaySize / 2,
-            borderWidth: applePieceReturned ? 0 : 3,
-            borderColor: 'rgba(255,220,50,0.8)',
-            borderStyle: 'dashed',
-          }]}>
-            <Image
-              source={applePieceReturned ? GAME_IMAGES.apple : GAME_IMAGES.appleBitten}
-              style={{ width: appleDisplaySize * 0.9, height: appleDisplaySize * 0.9 }}
-              contentFit="contain"
-            />
+        {/* Bitten Apple — pre-render ซ่อนตอน intro */}
+        {(phase === 'intro' || phase === 'playing') && (
+          <View style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+            <GestureDetector gesture={applePanGesture}>
+              <Animated.View style={[styles.bittenApple, {
+                left: appleTargetX - appleDisplaySize / 2,
+                top: appleTargetY - appleDisplaySize / 2,
+                width: appleDisplaySize,
+                height: appleDisplaySize,
+                borderRadius: appleDisplaySize / 2,
+                borderWidth: applePieceReturned ? 0 : 3,
+                borderColor: 'rgba(255,220,50,0.8)',
+                borderStyle: 'dashed',
+              }, appleAnimStyle]}>
+                <Image
+                  source={applePieceReturned ? GAME_IMAGES.apple : GAME_IMAGES.appleBitten}
+                  style={{ width: appleDisplaySize * 0.9, height: appleDisplaySize * 0.9 }}
+                  contentFit="contain"
+                />
+              </Animated.View>
+            </GestureDetector>
           </View>
         )}
 
-        {/* Worm Character */}
-        {phase === 'playing' && (
-          <WormCharacter
-            sw={sw}
-            sh={sh}
-            initialX={wormInitPos?.x}
-            initialY={wormInitPos?.y}
-            onCaught={handleWormCaught}
-            isActive={!wormCaught}
-          />
-        )}
-
-        {/* Apple Piece — appears when worm caught, drag to bitten apple */}
-        {phase === 'playing' && wormCaught && !applePieceReturned && (
-          <DraggableApplePiece
-            startX={wormLastPos.x}
-            startY={wormLastPos.y}
-            targetX={appleTargetX}
-            targetY={appleTargetY}
-            size={appleDisplaySize * 0.7}
-            isPlaced={applePieceReturned}
-            onPlace={handleApplePieceReturn}
-            onWrongPlace={handleWrongPlace}
-          />
+        {/* Worm — pre-render ซ่อนตอน intro */}
+        {(phase === 'intro' || phase === 'playing') && !applePieceReturned && (
+          <View style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+            <WormCharacter
+              sw={sw}
+              sh={sh}
+              initialX={wormInitPos?.x}
+              initialY={wormInitPos?.y}
+              appleTargetX={appleTargetX}
+              appleTargetY={appleTargetY}
+              appleSize={appleDisplaySize}
+              onReturnApple={handleApplePieceReturn}
+              isActive={phase === 'playing' && !applePieceReturned}
+            />
+          </View>
         )}
 
         {/* Hint Button */}
@@ -358,6 +407,9 @@ export default function GameScreen() {
         {phase === 'playing' && showCountdown && countdownNum > 0 && (
           <CountdownNumber number={countdownNum} sw={sw} sh={sh} />
         )}
+
+        {/* Celebration — แอปเปิ้ล + APPLE + confetti 3 วินาที */}
+        {phase === 'celebration' && <CelebrationOverlay />}
 
         {/* Victory / Time's Up Overlay */}
         {(phase === 'victory' || phase === 'timeup') && (

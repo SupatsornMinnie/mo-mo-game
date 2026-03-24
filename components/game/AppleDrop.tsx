@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet } from 'react-native';
+import { Audio } from 'expo-av';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,12 +11,12 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { GAME_IMAGES, LETTER_IMAGES, APPLE_LETTERS, calculateSlotPositions } from '../../utils/gameConfig';
+import { GAME_IMAGES, LETTER_IMAGES, APPLE_LETTERS, SFX_SOUNDS, calculateSlotPositions } from '../../utils/gameConfig';
 
 interface AppleDropProps {
   sw: number;
   sh: number;
-  scatterPositions: { x: number; y: number }[];
+  scatterPositions: { x: number; y: number; rotation?: number }[];
   onIntroComplete: () => void;
   onWormPosition?: (x: number, y: number) => void;
 }
@@ -23,54 +24,63 @@ interface AppleDropProps {
 export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, onWormPosition }: AppleDropProps) {
   const [showBitten, setShowBitten] = useState(false);
   const [wormAlert, setWormAlert] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   const slotPositions = calculateSlotPositions(sw, sh);
-  // แอปเปิ้ลตกลงมาส่วนบนของจอ (ตัวอักษรอยู่ส่วนล่าง sh*0.62)
   const appleLandY = sh * 0.25;
-
-  // Apple size — ใหญ่กว่าเดิม
-  const appleSize = Math.min(Math.max(sw * 0.28, 100), sh * 0.28, 180);
+  const appleSize = Math.min(Math.max(sw * 0.35, 120), sh * 0.38, 230);
   const letterSize = slotPositions[0]?.size || 55;
 
-  // Apple starts off screen
+  // สุ่มมุมเอียงแอปเปิ้ล 360 องศา
+  const appleRotationAngle = useRef(Math.random() * 360 - 180).current;
+
   const appleY = useSharedValue(-sh * 0.3);
   const appleScale = useSharedValue(1);
+  const appleRotation = useSharedValue(0);
 
-  // Letters start at slot positions (visible from the start!)
   const letterX = APPLE_LETTERS.map((_, i) => useSharedValue(slotPositions[i].x));
   const letterY = APPLE_LETTERS.map((_, i) => useSharedValue(slotPositions[i].y));
   const letterOpacities = APPLE_LETTERS.map(() => useSharedValue(1));
   const letterScale = APPLE_LETTERS.map(() => useSharedValue(1));
-  const letterRotation = APPLE_LETTERS.map(() => useSharedValue(0)); // เริ่มตรง
+  const letterRotation = APPLE_LETTERS.map(() => useSharedValue(0));
 
-  // Worm — อยู่นิ่งตำแหน่งสุ่ม
   const wormRandX = sw * 0.2 + Math.random() * (sw * 0.5);
   const wormRandY = sh * 0.55 + Math.random() * (sh * 0.25);
   const wormOpacity = useSharedValue(1);
 
+  const soundsListRef = useRef<Audio.Sound[]>([]);
+  const playSound = async (sfx: any) => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(sfx);
+      soundsListRef.current.push(sound);
+      await sound.playAsync();
+    } catch (e) {}
+  };
+
   useEffect(() => {
-    // บอก game.tsx ว่าหนอนอยู่ตำแหน่งไหน
     if (onWormPosition) onWormPosition(wormRandX, wormRandY);
 
-    // === Timeline ===
-    // t=0~1000ms: ตัวอักษร APPLE โชว์กลางจอล่าง + หนอนนิ่ง
-    //
-    // t=1000ms: แอปเปิ้ลตกจากด้านบน → ตกลงไปถึงตัวอักษร (sh*0.62)
-    //           แล้วเด้งขึ้นมาอยู่ครึ่งบน (appleLandY)
     const slotY = slotPositions[0]?.y || sh * 0.62;
-    const impactTime = 1600; // เวลาที่แอปเปิ้ลถึงตัวอักษร
+    const impactTime = 1600;
+
+    // แอปเปิ้ลตกลงมา + เอียงสุ่ม
+    appleRotation.value = withDelay(
+      1000,
+      withTiming(appleRotationAngle, { duration: 600, easing: Easing.in(Easing.quad) })
+    );
 
     appleY.value = withDelay(
       1000,
       withSequence(
-        // ตกลงไปถึงตัวอักษร (ครึ่งล่าง)
         withTiming(slotY - appleSize / 2, { duration: 600, easing: Easing.in(Easing.quad) }),
-        // เด้งขึ้นมาอยู่ครึ่งบน
         withSpring(appleLandY - appleSize / 2, { damping: 12, stiffness: 150 })
       )
     );
 
-    // t=impactTime: กระทบ! แอปเปิ้ลสั่น → bitten + ตัวอักษรแตกทันที!
+    // เสียง fall ตอนตก
+    setTimeout(() => playSound(SFX_SOUNDS.fall), 1000);
+
+    // กระทบ
     appleScale.value = withDelay(
       impactTime,
       withSequence(
@@ -82,9 +92,14 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
     setTimeout(() => setShowBitten(true), impactTime);
     setTimeout(() => setWormAlert(true), impactTime);
 
-    // ตัวอักษรกระจายทันทีตอนกระทบ (ไม่ delay เพิ่ม!)
+    // เสียง bang ตอนกระทบตัวอักษร (เด้ง 1 ดังสุด)
+    setTimeout(() => playSound(SFX_SOUNDS.bang), impactTime);
+    // เด้ง 2 — เสียง ตึง (140 + 450 + 360 = 950ms หลัง impact)
+    setTimeout(() => playSound(SFX_SOUNDS.bang), impactTime + 950);
+    // เด้ง 3 — เสียง ตึง (950 + 320 + 250 = 1520ms หลัง impact)
+    setTimeout(() => playSound(SFX_SOUNDS.bang), impactTime + 1520);
+
     APPLE_LETTERS.forEach((_, i) => {
-      // สั่นเล็กน้อย
       letterScale[i].value = withDelay(
         impactTime,
         withSequence(
@@ -92,24 +107,98 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
           withTiming(1, { duration: 60 })
         )
       );
-      // กระจายทันที (delay แค่ i*30 ให้ไล่กัน) + เอียง
+      const tx = scatterPositions[i].x;
+      const ty = scatterPositions[i].y;
+
+      // ใช้ rotation เดียวกับ scatterPositions เพื่อไม่ให้กระโดดตอนเปลี่ยน phase
+      const finalRot = scatterPositions[i].rotation || 0;
+
+      // จุดกระทบ = ตำแหน่งแอปเปิ้ล (กลางจอ)
+      const impactX = sw * 0.5 - letterSize / 2;
+      const impactY = appleLandY;
+
+      // สุ่มจุด landing แต่ละเด้ง — กระเด็นไกลและเปลี่ยนทิศทุกเด้ง
+      const randDir = () => (Math.random() > 0.5 ? 1 : -1);
+
+      // เด้ง 1: กระเด็นไกลมาก ทิศสุ่ม
+      const b1DirX = randDir();
+      const b1LandX = impactX + b1DirX * sw * (0.2 + Math.random() * 0.25);
+      const b1PeakY = Math.min(impactY, ty) - sh * 0.25;
+
+      // เด้ง 2: กระเด็นไปทิศตรงข้าม ไกลปานกลาง
+      const b2DirX = -b1DirX; // เปลี่ยนทิศ!
+      const b2LandX = b1LandX + b2DirX * sw * (0.15 + Math.random() * 0.2);
+      const b2PeakY = b1PeakY + sh * 0.08;
+      const b2LandY = impactY + Math.random() * sh * 0.1;
+
+      // เด้ง 3: กระเด็นเปลี่ยนทิศอีกครั้ง ค่อยๆ ไปจุดหมาย
+      const b3DirX = randDir();
+      const b3MidX = b2LandX + b3DirX * sw * (0.05 + Math.random() * 0.1);
+      const b3PeakY = ty - sh * 0.06 - Math.random() * sh * 0.04;
+
+      // สุ่ม rotation แต่ละเด้ง — หมุนแรง
+      const r1 = (Math.random() - 0.5) * 360;
+      const r2 = r1 + (Math.random() - 0.5) * 270;
+      const r3 = r2 + (Math.random() - 0.5) * 120;
+
       letterX[i].value = withDelay(
-        impactTime + i * 30,
-        withSpring(scatterPositions[i].x, { damping: 10, stiffness: 120 })
+        impactTime + i * 50,
+        withSequence(
+          withTiming(impactX, { duration: 140, easing: Easing.in(Easing.quad) }),
+          // เด้ง 1 — กระเด็นไกล
+          withTiming(b1LandX, { duration: 450, easing: Easing.out(Easing.quad) }),
+          // ตกลง
+          withTiming(b2LandX, { duration: 360, easing: Easing.in(Easing.quad) }),
+          // เด้ง 2 — กระเด็นทิศตรงข้าม ไกล
+          withTiming(b3MidX, { duration: 320, easing: Easing.out(Easing.quad) }),
+          // ตกลง
+          withTiming(b3MidX + (tx - b3MidX) * 0.4, { duration: 250, easing: Easing.in(Easing.quad) }),
+          // เด้ง 3 — ค่อยๆ ไปจุดหมาย
+          withTiming(tx + (Math.random() - 0.5) * 15, { duration: 180, easing: Easing.out(Easing.quad) }),
+          withTiming(tx, { duration: 100 }),
+        )
       );
       letterY[i].value = withDelay(
-        impactTime + i * 30,
-        withSpring(scatterPositions[i].y, { damping: 10, stiffness: 120 })
+        impactTime + i * 50,
+        withSequence(
+          withTiming(impactY, { duration: 140, easing: Easing.in(Easing.quad) }),
+          // เด้ง 1 — ขึ้นสูงมาก
+          withTiming(b1PeakY, { duration: 450, easing: Easing.out(Easing.quad) }),
+          // ตกลง
+          withTiming(b2LandY, { duration: 360, easing: Easing.in(Easing.quad) }),
+          // เด้ง 2 — ขึ้นปานกลาง
+          withTiming(b2PeakY, { duration: 320, easing: Easing.out(Easing.quad) }),
+          // ตกลง
+          withTiming(ty + sh * 0.02, { duration: 250, easing: Easing.in(Easing.quad) }),
+          // เด้ง 3 — เด้งเบาๆ
+          withTiming(b3PeakY, { duration: 180, easing: Easing.out(Easing.quad) }),
+          withTiming(ty, { duration: 100 }),
+        )
       );
       letterRotation[i].value = withDelay(
-        impactTime + i * 30,
-        withSpring(scatterPositions[i].rotation || 0, { damping: 8, stiffness: 100 })
+        impactTime + i * 50,
+        withSequence(
+          withTiming(0, { duration: 140 }),
+          // เด้ง 1 — หมุนแรง
+          withTiming(r1, { duration: 450 }),
+          // ตกลง
+          withTiming(r2, { duration: 360 }),
+          // เด้ง 2 — หมุนเปลี่ยนทิศ
+          withTiming(r2 + (r3 - r2) * 0.6, { duration: 320 }),
+          // ตกลง
+          withTiming(r3, { duration: 250 }),
+          // เด้ง 3 — ค่อยๆ หยุด
+          withTiming(finalRot + 3, { duration: 180 }),
+          withTiming(finalRot, { duration: 100 }),
+        )
       );
     });
 
-    // t=2800ms: Intro จบ → เข้าสู่ playing phase (เร็วขึ้น)
-    const timer = setTimeout(() => onIntroComplete(), 2800);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => onIntroComplete(), 3800);
+    return () => {
+      clearTimeout(timer);
+      soundsListRef.current.forEach(s => s.unloadAsync().catch(() => {}));
+    };
   }, []);
 
   const appleStyle = useAnimatedStyle(() => ({
@@ -117,6 +206,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
       { translateX: sw * 0.5 - appleSize / 2 },
       { translateY: appleY.value },
       { scale: appleScale.value },
+      { rotate: `${appleRotation.value}deg` },
     ],
   }));
 
