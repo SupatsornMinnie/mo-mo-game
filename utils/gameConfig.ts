@@ -59,7 +59,7 @@ export const SFX_SOUNDS = {
   bang: require("../assets/sounds/jump.mp3"),
   pop: require("../assets/sounds/bubble_break.wav"),
   bgm: require("../assets/sounds/happy-music-loop.mp3"),
-  clockBeep: require("../assets/sounds/clock_beep.mp3"),
+  clockBeep: require("../assets/sounds/clock_beep.wav"),
   win: require("../assets/sounds/win.wav"),
   lose: require("../assets/sounds/lose.mp3"),
 };
