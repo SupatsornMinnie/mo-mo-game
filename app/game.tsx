@@ -105,9 +105,13 @@ export default function GameScreen() {
         setCountdownNum(5);
       },
       onTimeUp: () => {
-        setPhase('timeup');
-        stopBGM();
-        playSFX('lose');
+        // เช็คว่ายังอยู่ใน playing อยู่ ไม่ให้ทับ celebration/victory
+        setPhase((prev) => {
+          if (prev !== 'playing') return prev;
+          stopBGM();
+          playSFX('lose');
+          return 'timeup';
+        });
       },
     }),
     [stopBGM, playSFX]
@@ -116,8 +120,8 @@ export default function GameScreen() {
   const { timeRemaining, progress, start: startTimer, pause: pauseTimer, reset: resetTimer } =
     useGameTimer(timerCallbacks);
 
-  // Countdown effect (5, 4, 3, 2, 1) + เสียง clock beep
-  const lastBeepRef = useRef(0);
+  // Countdown effect (5, 4, 3, 2, 1) + เสียง clock beep ครั้งเดียวตอนเริ่ม 5 วิ
+  const beepPlayedRef = useRef(false);
   useEffect(() => {
     // หยุดเสียง beep ถ้าไม่ได้อยู่ใน phase playing
     if (phase !== 'playing') return;
@@ -143,13 +147,14 @@ export default function GameScreen() {
     if (phase !== 'playing') return;
     const allPlaced = placedLetters.every(Boolean);
     if (allPlaced && applePieceReturned) {
+      pauseTimer(); // หยุด timer ทันทีเมื่อชนะ ป้องกัน TIME'S UP ทับ
       setPhase('celebration');
       pauseTimer(); // หยุด timer ทันที
       stopBGM();
       playWordThenWin();
       setTimeout(() => setPhase('victory'), 3500);
     }
-  }, [placedLetters, applePieceReturned, phase, stopBGM, playWordThenWin]);
+  }, [placedLetters, applePieceReturned, phase, pauseTimer, stopBGM, playWordThenWin]);
 
   // === Handlers ===
   const handleIntroComplete = useCallback(() => {
@@ -276,9 +281,9 @@ export default function GameScreen() {
           <Text style={styles.backText}>{'←'}</Text>
         </Pressable>
 
-        {/* Timer Bar — pre-render แต่ซ่อนตอน intro */}
+        {/* Timer Bar — pre-render แต่ซ่อนตอน intro (absolute overlay ไม่กระทบ layout) */}
         {(phase === 'intro' || phase === 'playing') && (
-          <View style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+          <View style={[StyleSheet.absoluteFill, { opacity: phase === 'playing' ? 1 : 0 }]} pointerEvents={phase === 'playing' ? 'box-none' : 'none'}>
             <TimerBar
               progress={progress}
               timeRemaining={timeRemaining}
@@ -289,7 +294,7 @@ export default function GameScreen() {
 
         {/* Intro Animation — เก็บไว้ตอน playing ชั่วครู่เพื่อไม่ให้กระตุก */}
         {(phase === 'intro' || phase === 'playing') && (
-          <View style={{ opacity: phase === 'intro' ? 1 : 0 }} pointerEvents="none">
+          <View style={[StyleSheet.absoluteFill, { opacity: phase === 'intro' ? 1 : 0 }]} pointerEvents="none">
             <AppleDrop
               sw={sw}
               sh={sh}
@@ -300,11 +305,12 @@ export default function GameScreen() {
           </View>
         )}
 
-        {/* Letter Slots (shadows) — pre-render แต่ซ่อนตอน intro */}
-        {(phase === 'intro' || phase === 'playing') &&
-          slotPositions.map((pos, i) => (
-            <View key={`slot-${i}`} style={{ opacity: phase === 'playing' ? 1 : 0 }}>
+        {/* Letter Slots (shadows) — pre-render แต่ซ่อนตอน intro (absolute ไม่กระทบ layout) */}
+        {(phase === 'intro' || phase === 'playing') && (
+          <View style={[StyleSheet.absoluteFill, { opacity: phase === 'playing' ? 1 : 0 }]} pointerEvents="none">
+            {slotPositions.map((pos, i) => (
               <LetterSlot
+                key={`slot-${i}`}
                 char={APPLE_LETTERS[i].char}
                 x={pos.x}
                 y={pos.y}
@@ -312,29 +318,31 @@ export default function GameScreen() {
                 isFilled={filledSlots[i]}
                 isHighlighted={highlightedSlot === i}
               />
-            </View>
-          ))}
+            ))}
+          </View>
+        )}
 
-        {/* Draggable Letters — pre-render ซ่อนตอน intro */}
-        {(phase === 'intro' || phase === 'playing') &&
-          APPLE_LETTERS.map((letter, i) => {
-            const baseChar = letter.char.replace(/\d+$/, '');
-            const validTargets = APPLE_LETTERS
-              .map((sl, si) => ({ sl, si }))
-              .filter(({ sl, si }) => {
-                const slotBase = sl.char.replace(/\d+$/, '');
-                return slotBase === baseChar && !filledSlots[si];
-              })
-              .map(({ si }) => ({
-                x: slotPositions[si].x,
-                y: slotPositions[si].y,
-                slotIndex: si,
-              }));
+        {/* Draggable Letters — pre-render ซ่อนตอน intro (absolute overlay) */}
+        {(phase === 'intro' || phase === 'playing') && (
+          <View style={[StyleSheet.absoluteFill, { opacity: phase === 'playing' ? 1 : 0 }]} pointerEvents={phase === 'playing' ? 'box-none' : 'none'}>
+            {APPLE_LETTERS.map((letter, i) => {
+              const baseChar = letter.char.replace(/\d+$/, '');
+              const validTargets = APPLE_LETTERS
+                .map((sl, si) => ({ sl, si }))
+                .filter(({ sl, si }) => {
+                  const slotBase = sl.char.replace(/\d+$/, '');
+                  return slotBase === baseChar && !filledSlots[si];
+                })
+                .map(({ si }) => ({
+                  x: slotPositions[si].x,
+                  y: slotPositions[si].y,
+                  slotIndex: si,
+                }));
 
-            const placedSlot = letterSlotMap[i];
-            return (
-              <View key={`letter-${i}`} style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+              const placedSlot = letterSlotMap[i];
+              return (
                 <DraggableLetter
+                  key={`letter-${i}`}
                   char={letter.char}
                   index={i}
                   scatterX={scatterPositions[i].x}
@@ -351,13 +359,14 @@ export default function GameScreen() {
                   onTouch={handleLetterTouch}
                   onTouchEnd={handleLetterTouchEnd}
                 />
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
+        )}
 
-        {/* Bitten Apple — pre-render ซ่อนตอน intro */}
+        {/* Bitten Apple — pre-render ซ่อนตอน intro (absolute overlay) */}
         {(phase === 'intro' || phase === 'playing') && (
-          <View style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+          <View style={[StyleSheet.absoluteFill, { opacity: phase === 'playing' ? 1 : 0 }]} pointerEvents={phase === 'playing' ? 'box-none' : 'none'}>
             <GestureDetector gesture={applePanGesture}>
               <Animated.View style={[styles.bittenApple, {
                 left: appleTargetX - appleDisplaySize / 2,
@@ -375,9 +384,9 @@ export default function GameScreen() {
           </View>
         )}
 
-        {/* Worm — pre-render ซ่อนตอน intro */}
+        {/* Worm — pre-render ซ่อนตอน intro (absolute overlay) */}
         {(phase === 'intro' || phase === 'playing') && !applePieceReturned && (
-          <View style={{ opacity: phase === 'playing' ? 1 : 0 }} pointerEvents={phase === 'playing' ? 'auto' : 'none'}>
+          <View style={[StyleSheet.absoluteFill, { opacity: phase === 'playing' ? 1 : 0 }]} pointerEvents={phase === 'playing' ? 'box-none' : 'none'}>
             <WormCharacter
               sw={sw}
               sh={sh}

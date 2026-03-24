@@ -29,7 +29,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
   const slotPositions = calculateSlotPositions(sw, sh);
   const appleLandY = sh * 0.25;
   const appleSize = Math.min(Math.max(sw * 0.35, 120), sh * 0.38, 230);
-  const letterSize = slotPositions[0]?.size || 55;
+  const letterSize = slotPositions[0]?.size || 50;
 
   // สุ่มมุมเอียงแอปเปิ้ล 360 องศา
   const appleRotationAngle = useRef(Math.random() * 360 - 180).current;

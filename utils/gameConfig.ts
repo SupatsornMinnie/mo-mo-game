@@ -1,5 +1,5 @@
 // ===== Game Constants =====
-export const GAME_DURATION = 10; // seพrrconds
+export const GAME_DURATION = 20; // seพrrconds
 export const HINT_FREE_COUNT = 3;
 export const HINT_AD_MAX = 5;
 export const INTRO_DURATION = 3000; // ms  
@@ -12,43 +12,43 @@ export interface LetterData {
 }
 
 export const APPLE_LETTERS: LetterData[] = [
-  { char: 'A', index: 0 },
-  { char: 'P', index: 1 },
-  { char: 'P2', index: 2 },
-  { char: 'L', index: 3 },
-  { char: 'E', index: 4 },
+  { char: "A", index: 0 },
+  { char: "P", index: 1 },
+  { char: "P2", index: 2 },
+  { char: "L", index: 3 },
+  { char: "E", index: 4 },
 ];
 
 // ===== Asset Maps (all from vocabulary/1apple/) =====
 export const LETTER_IMAGES: Record<string, any> = {
-  A: require('../assets/alphabet/A/A.webp'),
-  P: require('../assets/alphabet/P/P.webp'),
-  P2: require('../assets/alphabet/P/P2.webp'),
-  L: require('../assets/alphabet/L/L.webp'),
-  E: require('../assets/alphabet/E/E.webp'),
+  A: require("../assets/alphabet/A/A.webp"),
+  P: require("../assets/alphabet/P/P.webp"),
+  P2: require("../assets/alphabet/P/P2.webp"),
+  L: require("../assets/alphabet/L/L.webp"),
+  E: require("../assets/alphabet/E/E.webp"),
 };
 
 export const LETTER_SOUNDS: Record<string, any> = {
-  A: require('../assets/sounds/a-z/A.mp3'),
-  P: require('../assets/sounds/a-z/P.mp3'),
-  P2: require('../assets/sounds/a-z/P.mp3'),
-  L: require('../assets/sounds/a-z/L.mp3'),
-  E: require('../assets/sounds/a-z/E.mp3'),
+  A: require("../assets/sounds/a-z/A.mp3"),
+  P: require("../assets/sounds/a-z/P.mp3"),
+  P2: require("../assets/sounds/a-z/P.mp3"),
+  L: require("../assets/sounds/a-z/L.mp3"),
+  E: require("../assets/sounds/a-z/E.mp3"),
 };
 
-export const WORD_SOUND = require('../assets/sounds/Apple.mp3');
+export const WORD_SOUND = require("../assets/sounds/Apple.mp3");
 
 export const GAME_IMAGES = {
-  apple: require('../assets/vocabulary/1apple/apple.webp'),
-  appleBitten: require('../assets/vocabulary/1apple/apple_bitten.webp'),
-  applePiece: require('../assets/vocabulary/1apple/apple_bitten2.png'), // เล็กอยู่แล้ว (2KB)
-  worm: require('../assets/vocabulary/1apple/worm.webp'),
-  wormRun: require('../assets/vocabulary/1apple/worm_run.webp'),
-  bg: require('../assets/vocabulary/1apple/bg.webp'),
-  hint: require('../assets/vocabulary/1apple/hint.webp'),
-  hint1: require('../assets/vocabulary/1apple/hint1.webp'),
-  hint2: require('../assets/vocabulary/1apple/hint2.webp'),
-  hint3: require('../assets/vocabulary/1apple/hint3.webp'),
+  apple: require("../assets/vocabulary/1apple/apple.webp"),
+  appleBitten: require("../assets/vocabulary/1apple/apple_bitten.webp"),
+  applePiece: require("../assets/vocabulary/1apple/apple_bitten2.webp"),
+  worm: require("../assets/vocabulary/1apple/worm.webp"),
+  wormRun: require("../assets/vocabulary/1apple/worm_run.webp"),
+  bg: require("../assets/vocabulary/1apple/bg.webp"),
+  hint: require("../assets/vocabulary/1apple/hint.webp"),
+  hint1: require("../assets/vocabulary/1apple/hint1.webp"),
+  hint2: require("../assets/vocabulary/1apple/hint2.webp"),
+  hint3: require("../assets/vocabulary/1apple/hint3.webp"),
   letters: LETTER_IMAGES,
 };
 
@@ -114,7 +114,9 @@ export function generateScatterPositions(sw: number, sh: number) {
     } while (
       tries < 30 &&
       positions.some(
-        (p) => Math.abs(p.x - x) < actualSize * 1.3 && Math.abs(p.y - y) < actualSize * 1.3
+        (p) =>
+          Math.abs(p.x - x) < actualSize * 1.3 &&
+          Math.abs(p.y - y) < actualSize * 1.3,
       )
     );
 
