@@ -1,5 +1,5 @@
 import { Audio } from "expo-av";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
 import {
   ImageBackground,
@@ -10,7 +10,8 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import SeaCreature from "../components/SeaCreature";
 import VocabBubble, { BubbleInfo } from "../components/VocabBubble";
-import { homeStyles } from "./styles/home.styles";
+import { homeStyles } from "../styles/home.styles";
+import { useVocabProgress } from "../hooks/useVocabProgress";
 
 // ===== ภาพ =====
 const BG_HOME = require("../assets/home/bg1.jpg");
@@ -45,48 +46,56 @@ const VOCAB_BUBBLES = [
     word: "Apple",
     image: require("../assets/vocabulary/1apple/bubble_apple.webp"),
     locked: false,
+    hasGame: true,   // เกมสร้างแล้ว → ไป /game
   },
   {
     id: 2,
     word: "Ant",
     image: require("../assets/vocabulary/2ant/bubble_ant.webp"),
     locked: false,
+    hasGame: false,  // ยังไม่ได้สร้าง → ไป /vocab-placeholder
   },
   {
     id: 3,
     word: "Actor",
     image: require("../assets/vocabulary/3actor/bubble_actor.webp"),
     locked: false,
+    hasGame: false,
   },
   {
     id: 4,
     word: "Airplane",
     image: require("../assets/vocabulary/4airplan/bubble_airplan.webp"),
     locked: false,
+    hasGame: false,
   },
   {
     id: 5,
     word: "Banana",
     image: require("../assets/vocabulary/5banana/bubble_banana.webp"),
     locked: true,
+    hasGame: false,
   },
   {
     id: 6,
     word: "Bird",
     image: require("../assets/vocabulary/6bird/bubble_bird.webp"),
     locked: true,
+    hasGame: false,
   },
   {
     id: 7,
     word: "Baker",
     image: require("../assets/vocabulary/7baker/bubble_baker.webp"),
     locked: true,
+    hasGame: false,
   },
   {
     id: 8,
     word: "Ball",
     image: require("../assets/vocabulary/8ball/bubble_ball.webp"),
     locked: true,
+    hasGame: false,
   },
 ];
 
@@ -95,6 +104,10 @@ const EMPTY_COUNT = 20;
 export default function HomeScreen() {
   const { width: sw, height: sh } = useWindowDimensions();
   const router = useRouter();
+  const { totalCompleted, reload: reloadVocab } = useVocabProgress();
+
+  // อ่าน progress ใหม่ทุกครั้งที่กลับมาหน้า home
+  useFocusEffect(useCallback(() => { reloadVocab(); }, [reloadVocab]));
   const bgmRef = useRef<Audio.Sound | null>(null);
   const sfxCache = useRef<{ [key: string]: Audio.Sound | null }>({});
 
@@ -258,8 +271,10 @@ export default function HomeScreen() {
 
   const handleVocabPop = useCallback(
     (vocab: (typeof VOCAB_BUBBLES)[0]) => {
+      // เกมสร้างแล้ว → ไป /game, ยังไม่ได้สร้าง → ไป /vocab-placeholder
+      const pathname = vocab.hasGame ? "/game" : "/vocab-placeholder";
       router.push({
-        pathname: "/game",
+        pathname,
         params: { word: vocab.word, id: String(vocab.id) },
       });
     },
@@ -268,7 +283,8 @@ export default function HomeScreen() {
 
   const handleMyBubble = useCallback(() => {
     playSound("bounce");
-  }, []);
+    router.push("/mybubble");
+  }, [router, playSound]);
 
   return (
     <GestureHandlerRootView style={homeStyles.container}>
@@ -338,7 +354,7 @@ export default function HomeScreen() {
         <Pressable style={homeStyles.myBubbleBtn} onPress={handleMyBubble}>
           <Text style={{ fontSize: 18 }}>🫧</Text>
           <Text style={homeStyles.myBubbleText}>My Bubble</Text>
-          <Text style={homeStyles.myBubbleCount}>0</Text>
+          <Text style={homeStyles.myBubbleCount}>{totalCompleted}</Text>
         </Pressable>
       </ImageBackground>
     </GestureHandlerRootView>

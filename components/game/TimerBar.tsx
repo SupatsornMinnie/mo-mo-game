@@ -6,20 +6,21 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
-  interpolateColor,
 } from 'react-native-reanimated';
+import HeartDisplay from './HeartDisplay';
 
 interface TimerBarProps {
   progress: number; // 1.0 (full) → 0.0 (empty)
   timeRemaining: number;
   isShaking: boolean;
+  hearts: number;
+  maxHearts: number;
 }
 
-export default function TimerBar({ progress, timeRemaining, isShaking }: TimerBarProps) {
+export default function TimerBar({ progress, timeRemaining, isShaking, hearts, maxHearts }: TimerBarProps) {
   const shake = useSharedValue(0);
   const isRed = progress <= 0.25;
 
-  // สั่นเฉพาะตอนสีแดง
   useEffect(() => {
     if (isShaking && isRed) {
       shake.value = withRepeat(
@@ -39,7 +40,6 @@ export default function TimerBar({ progress, timeRemaining, isShaking }: TimerBa
     transform: [{ translateX: shake.value }],
   }));
 
-  // Color: green → yellow → red
   const getBarColor = () => {
     if (progress > 0.5) return '#44BB44';
     if (progress > 0.25) return '#FFD700';
@@ -62,6 +62,7 @@ export default function TimerBar({ progress, timeRemaining, isShaking }: TimerBa
       <Text style={[styles.timeText, progress <= 0.25 && styles.timeTextDanger]}>
         {Math.ceil(timeRemaining)}s
       </Text>
+      <HeartDisplay hearts={hearts} maxHearts={maxHearts} />
     </Animated.View>
   );
 }
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     left: 80,
-    right: 80,
+    right: 15,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 50,

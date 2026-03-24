@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -11,7 +11,8 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { GAME_IMAGES } from '../../utils/gameConfig';
+import { Audio } from 'expo-av';
+import { GAME_IMAGES, LETTER_SOUNDS } from '../../utils/gameConfig';
 
 // Confetti ชิ้นเล็ก ๆ ลอยตกลงมา
 function ConfettiPiece({ index, sw, sh }: { index: number; sw: number; sh: number }) {
@@ -147,6 +148,8 @@ export default function CelebrationOverlay() {
   const letterSize = Math.min(sw * 0.08, sh * 0.15, 55);
   const word = 'APPLE';
 
+  const soundsRef = useRef<Audio.Sound[]>([]);
+
   useEffect(() => {
     bgOpacity.value = withTiming(1, { duration: 300 });
 
@@ -165,18 +168,35 @@ export default function CelebrationOverlay() {
       )
     );
 
-    // ตัวอักษรทีละตัว pop in
+    // ตัวอักษรทีละตัว pop in + เล่นเสียงอ่านตัวอักษรทีละตัว
+    const letterChars = ['A', 'P', 'P', 'L', 'E'];
     letterScales.forEach((s, i) => {
-      s.value = withDelay(400 + i * 150,
+      const delay = 400 + i * 150;
+      s.value = withDelay(delay,
         withSequence(
           withSpring(1.4, { damping: 4, stiffness: 200 }),
           withSpring(1, { damping: 6 }),
         )
       );
-      letterY[i].value = withDelay(400 + i * 150,
+      letterY[i].value = withDelay(delay,
         withSpring(0, { damping: 6, stiffness: 120 })
       );
+      // เสียงอ่านตัวอักษรทีละตัว ตอน pop in
+      setTimeout(async () => {
+        try {
+          const src = LETTER_SOUNDS[letterChars[i]];
+          if (src) {
+            const { sound } = await Audio.Sound.createAsync(src);
+            soundsRef.current.push(sound);
+            await sound.playAsync();
+          }
+        } catch (e) {}
+      }, delay);
     });
+
+    return () => {
+      soundsRef.current.forEach(s => s.unloadAsync().catch(() => {}));
+    };
   }, []);
 
   const bgStyle = useAnimatedStyle(() => ({

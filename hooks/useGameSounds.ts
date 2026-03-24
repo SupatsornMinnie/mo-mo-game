@@ -80,16 +80,35 @@ export function useGameSounds() {
     } catch (e) {}
   }, []);
 
-  // เล่นเสียง win หลังจากเสียง word จบ
+  // หยุดและ unload เสียง ทั้งหมด (BGM + SFX) — เรียกตอนออกจากหน้า
+  const stopAllSounds = useCallback(async () => {
+    try {
+      // หยุด BGM
+      if (bgmRef.current) {
+        await bgmRef.current.stopAsync().catch(() => {});
+        await bgmRef.current.unloadAsync().catch(() => {});
+        bgmRef.current = null;
+      }
+      // หยุด SFX ทุกตัว
+      const stops = Array.from(soundsRef.current.values()).map((s) =>
+        s.stopAsync().catch(() => {}).then(() => s.unloadAsync().catch(() => {}))
+      );
+      await Promise.all(stops);
+      soundsRef.current.clear();
+    } catch (e) {}
+  }, []);
+
+  // เล่นเสียง win ก่อน แล้วดีเลย์ 1 วิ ค่อยเล่นเสียงคำว่า "APPLE"
   const playWordThenWin = useCallback(async () => {
     try {
-      // เล่น word + win พร้อมกัน
-      playSound(WORD_SOUND, 'word_apple');
       playSFX('win');
+      setTimeout(() => {
+        playSound(WORD_SOUND, 'word_apple');
+      }, 1000); // ดีเลย์ 1 วินาที ค่อยพูดคำว่า APPLE
     } catch (e) {
       console.warn('WordThenWin error:', e);
     }
   }, [playSound, playSFX]);
 
-  return { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, playWordThenWin };
+  return { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, stopAllSounds, playWordThenWin };
 }

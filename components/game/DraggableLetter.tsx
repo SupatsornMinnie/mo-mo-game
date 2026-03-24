@@ -206,7 +206,7 @@ export default function DraggableLetter({
   // ถ้าตัว A กำลังเล่น sprite → ใช้ภาพ sprite (ใหญ่ขึ้นเพราะมีปีก)
   const isSpriting = isLetterA && spriteFrame >= 0;
   const imgSource = isSpriting ? A_SPRITE_FRAMES[spriteFrame] : LETTER_IMAGES[char];
-  const imgSize = isSpriting ? size * 1.8 : size * 0.9;
+  const imgSize = isSpriting ? size * 1.8 : size;
 
   // ถ้า placed แล้ว → ซ่อนเลย (LetterSlot จะแสดงตัวอักษรจริงแทน)
   if (isPlaced) {

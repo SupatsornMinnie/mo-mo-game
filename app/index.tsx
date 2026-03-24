@@ -384,16 +384,10 @@ export default function SplashScreen() {
     hasNavigated.current = true;
     soundRef.current?.stopAsync();
     soundRef.current?.unloadAsync();
-    // router.replace('/home');
-    router.replace('/game');  // ข้ามไปหน้า game ตรงๆ
+    router.replace('/home');
   }, [router]);
 
-  // === ข้ามไปหน้า game ตรงๆ ===
-  return <Redirect href="/game" />;
-
-  // เล่นเพลงพื้นหลัง (ไม่ต้อง pre-load รูปภาพ)
-  // === คอมเม้นไว้ก่อน ===
-  /*
+  // เล่นเพลงพื้นหลัง — พอเพลงจบ ไปหน้า home อัตโนมัติ
   useEffect(() => {
     let mounted = true;
 
@@ -420,13 +414,13 @@ export default function SplashScreen() {
         }
       } catch (e) {
         console.warn('BGM error:', e);
+        goHome(); // ถ้าเล่นเพลงไม่ได้ ข้ามไป home เลย
       }
     };
 
     playBGM();
     return () => { mounted = false; soundRef.current?.unloadAsync(); };
   }, []);
-  */
 
   // คำนวณขนาดและตำแหน่ง (responsive)
   const letterSize = Math.min(sw / 14, 70);

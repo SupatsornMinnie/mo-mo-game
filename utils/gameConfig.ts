@@ -1,9 +1,13 @@
 // ===== Game Constants =====
-export const GAME_DURATION = 20; // seพrrconds
+export const GAME_DURATION = 60; // seconds
 export const HINT_FREE_COUNT = 3;
 export const HINT_AD_MAX = 5;
-export const INTRO_DURATION = 3000; // ms  
+export const INTRO_DURATION = 3000; // ms
 export const SNAP_THRESHOLD = 40; // px — how close to slot to count as correct
+
+// ===== Heart / Life System =====
+export const MAX_HEARTS = 5;
+export const HEART_REGEN_MS = 0.5 * 60 * 1000; // 5 นาทีต่อ 1 หัวใจ
 
 // ===== Word Data =====
 export interface LetterData {
@@ -50,18 +54,19 @@ export const GAME_IMAGES = {
   hint2: require("../assets/vocabulary/1apple/hint2.webp"),
   hint3: require("../assets/vocabulary/1apple/hint3.webp"),
   letters: LETTER_IMAGES,
+  heart: require("../assets/images/life.png"),
 };
 
 export const SFX_SOUNDS = {
-  correct: require('../assets/sounds/correct.mp3'),
-  wrong: require('../assets/sounds/wrong.mp3'),
-  fall: require('../assets/sounds/fall.mp3'),
-  bang: require('../assets/sounds/jump.mp3'),
-  pop: require('../assets/sounds/bubble_break.wav'),
-  bgm: require('../assets/sounds/happy-music-loop.mp3'),
-  clockBeep: require('../assets/sounds/clock_beep.wav'),
-  win: require('../assets/sounds/win.wav'),
-  lose: require('../assets/sounds/lose.mp3'),
+  correct: require("../assets/sounds/correct.mp3"),
+  wrong: require("../assets/sounds/wrong.mp3"),
+  fall: require("../assets/sounds/fall.mp3"),
+  bang: require("../assets/sounds/jump.mp3"),
+  pop: require("../assets/sounds/bubble_break.wav"),
+  bgm: require("../assets/sounds/happy-music-loop.mp3"),
+  clockBeep: require("../assets/sounds/clock_beep.wav"),
+  win: require("../assets/sounds/win.wav"),
+  lose: require("../assets/sounds/lose.mp3"),
 };
 
 // ===== Position Helpers =====

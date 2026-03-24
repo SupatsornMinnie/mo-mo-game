@@ -3,11 +3,13 @@ import { View, Text, Pressable, ImageBackground, useWindowDimensions, ActivityIn
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 import { useAssetPreloader } from '../hooks/useAssetPreloader';
 import { useGameSounds } from '../hooks/useGameSounds';
 import { useGameTimer } from '../hooks/useGameTimer';
+import { useHearts } from '../hooks/useHearts';
+import { useVocabProgress } from '../hooks/useVocabProgress';
 import {
   APPLE_LETTERS,
   GAME_IMAGES,
@@ -27,14 +29,16 @@ import CountdownNumber from '../components/game/CountdownNumber';
 import GameOverlay from '../components/game/GameOverlay';
 import CelebrationOverlay from '../components/game/CelebrationOverlay';
 
-type GamePhase = 'loading' | 'intro' | 'playing' | 'celebration' | 'victory' | 'timeup';
+type GamePhase = 'loading' | 'intro' | 'playing' | 'celebration' | 'victory' | 'timeup' | 'nohearts';
 
 export default function GameScreen() {
   const router = useRouter();
   const { word, id } = useLocalSearchParams<{ word: string; id: string }>();
   const { width: sw, height: sh } = useWindowDimensions();
   const { loaded } = useAssetPreloader();
-  const { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, playWordThenWin } = useGameSounds();
+  const { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, stopAllSounds, playWordThenWin } = useGameSounds();
+  const { hearts, maxHearts, isLoaded: heartsLoaded, canPlay, loseHeart, nextRegenIn } = useHearts();
+  const { markCompleted } = useVocabProgress();
 
   // Game state
   const [phase, setPhase] = useState<GamePhase>('loading');
@@ -51,8 +55,10 @@ export default function GameScreen() {
   );
   const [applePieceReturned, setApplePieceReturned] = useState(false);
   const [wormInitPos, setWormInitPos] = useState<{ x: number; y: number } | null>(null);
+  const [appleRotationAngle, setAppleRotationAngle] = useState(0);
   const [freeHints, setFreeHints] = useState(HINT_FREE_COUNT);
   const [highlightedSlot, setHighlightedSlot] = useState<number | null>(null);
+  const [highlightApple, setHighlightApple] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdownNum, setCountdownNum] = useState(5);
   const [isTimerShaking, setIsTimerShaking] = useState(false);
@@ -60,6 +66,33 @@ export default function GameScreen() {
 
   // Positions
   const slotPositions = useMemo(() => calculateSlotPositions(sw, sh), [sw, sh]);
+
+  // Apple hint pulse
+  const appleHintPulse = useSharedValue(1);
+  const appleHintBorder = useSharedValue(0); // 0 = ซ่อน, 3 = แสดง
+  useEffect(() => {
+    if (highlightApple) {
+      appleHintBorder.value = 3;
+      appleHintPulse.value = withRepeat(
+        withSequence(
+          withTiming(1.12, { duration: 350 }),
+          withTiming(1, { duration: 350 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      appleHintBorder.value = 0;
+      appleHintPulse.value = withTiming(1, { duration: 200 });
+    }
+  }, [highlightApple]);
+
+  const appleHintStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: appleHintPulse.value }],
+    borderWidth: appleHintBorder.value,
+    borderColor: '#FFD700',
+    borderRadius: 999,
+  }));
 
   // แอปเปิ้ลลากได้
   const appleTransX = useSharedValue(0);
@@ -87,6 +120,7 @@ export default function GameScreen() {
       { translateX: appleTransX.value },
       { translateY: appleTransY.value },
       { scale: appleScale.value },
+      { rotate: `${appleRotationAngle}deg` },
     ],
   }));
   const [scatterPositions, setScatterPositions] = useState(() =>
@@ -110,37 +144,45 @@ export default function GameScreen() {
           if (prev !== 'playing') return prev;
           stopBGM();
           playSFX('lose');
+          loseHeart(); // เสียหัวใจ 1 ดวง
           return 'timeup';
         });
       },
     }),
-    [stopBGM, playSFX]
+    [stopBGM, playSFX, loseHeart]
   );
 
   const { timeRemaining, progress, start: startTimer, pause: pauseTimer, reset: resetTimer } =
     useGameTimer(timerCallbacks);
 
-  // Countdown effect (5, 4, 3, 2, 1) + เสียง clock beep ครั้งเดียวตอนเริ่ม 5 วิ
+  // Countdown effect (5, 4, 3, 2, 1) + เสียง clock beep ครั้งเดียวตอนเหลือ 5 วิ
   const beepPlayedRef = useRef(false);
   useEffect(() => {
-    // หยุดเสียง beep ถ้าไม่ได้อยู่ใน phase playing
     if (phase !== 'playing') return;
-    if (showCountdown && timeRemaining < 5 && timeRemaining > 0) {
+    if (showCountdown && timeRemaining <= 5 && timeRemaining > 0) {
       const num = Math.ceil(timeRemaining);
       setCountdownNum(num);
-      if (num !== lastBeepRef.current) {
-        lastBeepRef.current = num;
+      // เล่นเสียง beep แค่ครั้งเดียวตอนเริ่ม countdown
+      if (!beepPlayedRef.current) {
+        beepPlayedRef.current = true;
         playSFX('clockBeep');
       }
     }
   }, [showCountdown, timeRemaining, playSFX, phase]);
 
-  // Start game when assets loaded
+  // Start game when assets + hearts loaded
   useEffect(() => {
-    if (loaded && phase === 'loading') {
+    if (loaded && heartsLoaded && phase === 'loading') {
+      setPhase(canPlay ? 'intro' : 'nohearts');
+    }
+  }, [loaded, heartsLoaded, phase, canPlay]);
+
+  // ถ้าหัวใจ regen ระหว่างรอ nohearts → เริ่มเกมอัตโนมัติ
+  useEffect(() => {
+    if (phase === 'nohearts' && canPlay) {
       setPhase('intro');
     }
-  }, [loaded, phase]);
+  }, [phase, canPlay]);
 
   // Check win condition: all letters + apple piece returned
   useEffect(() => {
@@ -149,12 +191,14 @@ export default function GameScreen() {
     if (allPlaced && applePieceReturned) {
       pauseTimer(); // หยุด timer ทันทีเมื่อชนะ ป้องกัน TIME'S UP ทับ
       setPhase('celebration');
-      pauseTimer(); // หยุด timer ทันที
       stopBGM();
       playWordThenWin();
-      setTimeout(() => setPhase('victory'), 3500);
+      // บันทึกคำศัพท์นี้ว่าเล่นชนะแล้ว
+      const vocabId = id ? parseInt(id, 10) : 1;
+      markCompleted(vocabId);
+      setTimeout(() => setPhase('victory'), 6500); // ค้าง celebration 6.5 วิ (+3 วิจากเดิม)
     }
-  }, [placedLetters, applePieceReturned, phase, pauseTimer, stopBGM, playWordThenWin]);
+  }, [placedLetters, applePieceReturned, phase, pauseTimer, stopBGM, playWordThenWin, markCompleted, id]);
 
   // === Handlers ===
   const handleIntroComplete = useCallback(() => {
@@ -214,6 +258,10 @@ export default function GameScreen() {
     setWormInitPos({ x, y });
   }, []);
 
+  const handleAppleRotation = useCallback((angle: number) => {
+    setAppleRotationAngle(angle);
+  }, []);
+
   const handleApplePieceReturn = useCallback(() => {
     playSFX('correct');
     setApplePieceReturned(true);
@@ -223,14 +271,23 @@ export default function GameScreen() {
     if (freeHints <= 0) return; // TODO: show ad prompt
     // Find first unplaced letter
     const idx = placedLetters.findIndex((p) => !p);
-    if (idx === -1) return;
+    if (idx === -1) {
+      // ตัวอักษรครบแล้ว — ถ้าหนอนยังไม่กลับ ให้ไฮไลต์แอปเปิ้ล
+      if (!applePieceReturned) {
+        setFreeHints((prev) => prev - 1);
+        setHighlightApple(true);
+        setTimeout(() => setHighlightApple(false), 3000);
+      }
+      return;
+    }
     setFreeHints((prev) => prev - 1);
     setHighlightedSlot(idx);
     // Clear highlight after 3 seconds
     setTimeout(() => setHighlightedSlot(null), 3000);
-  }, [freeHints, placedLetters]);
+  }, [freeHints, placedLetters, applePieceReturned]);
 
   const handleRetry = useCallback(() => {
+    if (!canPlay) { setPhase('nohearts'); return; }
     setPhase('intro');
     setPlacedLetters(APPLE_LETTERS.map(() => false));
     setLetterSlotMap(APPLE_LETTERS.map(() => -1));
@@ -238,17 +295,20 @@ export default function GameScreen() {
     setApplePieceReturned(false);
     setFreeHints(HINT_FREE_COUNT);
     setHighlightedSlot(null);
+    setHighlightApple(false);
     setShowCountdown(false);
     setIsTimerShaking(false);
     setIsHintBlinking(false);
     setWormInitPos(null);
     setScatterPositions(generateScatterPositions(sw, sh)); // สุ่มตำแหน่งใหม่!
+    beepPlayedRef.current = false; // reset เสียง beep สำหรับรอบใหม่
     resetTimer();
-  }, [resetTimer, sw, sh]);
+  }, [resetTimer, sw, sh, canPlay]);
 
-  const handleHome = useCallback(() => {
+  const handleHome = useCallback(async () => {
+    await stopAllSounds(); // หยุดเสียงทั้งหมดก่อนออกจากหน้า
     router.back();
-  }, [router]);
+  }, [router, stopAllSounds]);
 
   // === Render ===
 
@@ -288,6 +348,8 @@ export default function GameScreen() {
               progress={progress}
               timeRemaining={timeRemaining}
               isShaking={isTimerShaking}
+              hearts={hearts}
+              maxHearts={maxHearts}
             />
           </View>
         )}
@@ -301,6 +363,7 @@ export default function GameScreen() {
               scatterPositions={scatterPositions}
               onIntroComplete={handleIntroComplete}
               onWormPosition={handleWormPosition}
+              onAppleRotation={handleAppleRotation}
             />
           </View>
         )}
@@ -371,12 +434,18 @@ export default function GameScreen() {
               <Animated.View style={[styles.bittenApple, {
                 left: appleTargetX - appleDisplaySize / 2,
                 top: appleTargetY - appleDisplaySize / 2,
-                width: appleDisplaySize,
-                height: appleDisplaySize,
               }, appleAnimStyle]}>
+                {/* วงกลม hint สีทอง */}
+                <Animated.View style={[{
+                  position: 'absolute',
+                  width: appleDisplaySize,
+                  height: appleDisplaySize,
+                  borderRadius: 999,
+                  borderStyle: 'dashed',
+                }, appleHintStyle]} pointerEvents="none" />
                 <Image
                   source={applePieceReturned ? GAME_IMAGES.apple : GAME_IMAGES.appleBitten}
-                  style={{ width: appleDisplaySize * 0.9, height: appleDisplaySize * 0.9 }}
+                  style={{ width: appleDisplaySize, height: appleDisplaySize }}
                   contentFit="contain"
                 />
               </Animated.View>
@@ -395,6 +464,7 @@ export default function GameScreen() {
               appleTargetX={appleTargetX}
               appleTargetY={appleTargetY}
               appleSize={appleDisplaySize}
+              appleRotation={appleRotationAngle}
               onReturnApple={handleApplePieceReturn}
               isActive={phase === 'playing' && !applePieceReturned}
             />
@@ -418,12 +488,14 @@ export default function GameScreen() {
         {/* Celebration — แอปเปิ้ล + APPLE + confetti 3 วินาที */}
         {phase === 'celebration' && <CelebrationOverlay />}
 
-        {/* Victory / Time's Up Overlay */}
-        {(phase === 'victory' || phase === 'timeup') && (
+        {/* Victory / Time's Up / No Hearts Overlay */}
+        {(phase === 'victory' || phase === 'timeup' || phase === 'nohearts') && (
           <GameOverlay
             type={phase}
             onRetry={handleRetry}
             onHome={handleHome}
+            heartsLeft={hearts}
+            nextRegenIn={nextRegenIn}
           />
         )}
       </ImageBackground>
