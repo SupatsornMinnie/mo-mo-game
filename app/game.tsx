@@ -113,22 +113,23 @@ export default function GameScreen() {
     [stopBGM, playSFX]
   );
 
-  const { timeRemaining, progress, start: startTimer, reset: resetTimer } =
+  const { timeRemaining, progress, start: startTimer, pause: pauseTimer, reset: resetTimer } =
     useGameTimer(timerCallbacks);
 
   // Countdown effect (5, 4, 3, 2, 1) + เสียง clock beep
   const lastBeepRef = useRef(0);
   useEffect(() => {
-    if (showCountdown && timeRemaining <= 5 && timeRemaining > 0) {
+    // หยุดเสียง beep ถ้าไม่ได้อยู่ใน phase playing
+    if (phase !== 'playing') return;
+    if (showCountdown && timeRemaining < 5 && timeRemaining > 0) {
       const num = Math.ceil(timeRemaining);
       setCountdownNum(num);
-      // เล่นเสียง beep ทุกวินาที (ไม่ซ้ำ)
       if (num !== lastBeepRef.current) {
         lastBeepRef.current = num;
         playSFX('clockBeep');
       }
     }
-  }, [showCountdown, timeRemaining, playSFX]);
+  }, [showCountdown, timeRemaining, playSFX, phase]);
 
   // Start game when assets loaded
   useEffect(() => {
@@ -143,8 +144,9 @@ export default function GameScreen() {
     const allPlaced = placedLetters.every(Boolean);
     if (allPlaced && applePieceReturned) {
       setPhase('celebration');
-      stopBGM(); // หยุดเพลงพื้นหลัง
-      playWordThenWin(); // เล่น "Apple" → รอจบ → เล่นเสียง win
+      pauseTimer(); // หยุด timer ทันที
+      stopBGM();
+      playWordThenWin();
       setTimeout(() => setPhase('victory'), 3500);
     }
   }, [placedLetters, applePieceReturned, phase, stopBGM, playWordThenWin]);
@@ -362,10 +364,6 @@ export default function GameScreen() {
                 top: appleTargetY - appleDisplaySize / 2,
                 width: appleDisplaySize,
                 height: appleDisplaySize,
-                borderRadius: appleDisplaySize / 2,
-                borderWidth: applePieceReturned ? 0 : 3,
-                borderColor: 'rgba(255,220,50,0.8)',
-                borderStyle: 'dashed',
               }, appleAnimStyle]}>
                 <Image
                   source={applePieceReturned ? GAME_IMAGES.apple : GAME_IMAGES.appleBitten}

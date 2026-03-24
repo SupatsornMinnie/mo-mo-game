@@ -2,7 +2,7 @@
 export const GAME_DURATION = 10; // seพrrconds
 export const HINT_FREE_COUNT = 3;
 export const HINT_AD_MAX = 5;
-export const INTRO_DURATION = 3000; // ms
+export const INTRO_DURATION = 3000; // ms  
 export const SNAP_THRESHOLD = 40; // px — how close to slot to count as correct
 
 // ===== Word Data =====
@@ -59,7 +59,7 @@ export const SFX_SOUNDS = {
   bang: require('../assets/sounds/jump.mp3'),
   pop: require('../assets/sounds/bubble_break.wav'),
   bgm: require('../assets/sounds/happy-music-loop.mp3'),
-  clockBeep: require('../assets/sounds/clock_beep.mp3'),
+  clockBeep: require('../assets/sounds/clock_beep.wav'),
   win: require('../assets/sounds/win.wav'),
   lose: require('../assets/sounds/lose.mp3'),
 };

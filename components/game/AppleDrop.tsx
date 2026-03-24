@@ -34,7 +34,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
   // สุ่มมุมเอียงแอปเปิ้ล 360 องศา
   const appleRotationAngle = useRef(Math.random() * 360 - 180).current;
 
-  const appleY = useSharedValue(-sh * 0.3);
+  const appleY = useSharedValue(-sh * 0.9);
   const appleScale = useSharedValue(1);
   const appleRotation = useSharedValue(0);
 
@@ -63,12 +63,7 @@ export default function AppleDrop({ sw, sh, scatterPositions, onIntroComplete, o
     const slotY = slotPositions[0]?.y || sh * 0.62;
     const impactTime = 1600;
 
-    // แอปเปิ้ลตกลงมา + เอียงสุ่ม
-    appleRotation.value = withDelay(
-      1000,
-      withTiming(appleRotationAngle, { duration: 600, easing: Easing.in(Easing.quad) })
-    );
-
+    // แอปเปิ้ลตกลงมา — ไม่หมุน อยู่ท่าเดิม
     appleY.value = withDelay(
       1000,
       withSequence(

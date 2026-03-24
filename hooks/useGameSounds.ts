@@ -83,24 +83,13 @@ export function useGameSounds() {
   // เล่นเสียง win หลังจากเสียง word จบ
   const playWordThenWin = useCallback(async () => {
     try {
-      // เล่น word sound ก่อน
-      const existing = soundsRef.current.get('word_apple');
-      if (existing) {
-        await existing.setPositionAsync(0);
-        await existing.playAsync();
-      } else {
-        const { sound } = await Audio.Sound.createAsync(WORD_SOUND);
-        soundsRef.current.set('word_apple', sound);
-        await sound.playAsync();
-      }
-      // รอ word จบ (~1 วินาที) แล้วเล่น win
-      setTimeout(() => {
-        playSFX('win');
-      }, 1200);
+      // เล่น word + win พร้อมกัน
+      playSound(WORD_SOUND, 'word_apple');
+      playSFX('win');
     } catch (e) {
       console.warn('WordThenWin error:', e);
     }
-  }, [playSFX]);
+  }, [playSound, playSFX]);
 
   return { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, playWordThenWin };
 }
