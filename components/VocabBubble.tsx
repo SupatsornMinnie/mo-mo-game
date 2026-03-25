@@ -109,6 +109,7 @@ export default function VocabBubble({
   const opacity = useSharedValue(0);
   const rotation = useSharedValue(0);
   const posX = useSharedValue(rand(screenW * 0.02, screenW * 0.82));
+  const sizeValue = useSharedValue(sizeRef.current); // shared value สำหรับ animated style
 
   // อัพเดท ref สำหรับ collision detection
   const updateRef = useCallback((currentY: number) => {
@@ -149,6 +150,7 @@ export default function VocabBubble({
     const swayDir = Math.random() > 0.5 ? 1 : -1;
 
     sizeRef.current = newSize;
+    sizeValue.value = newSize; // sync shared value สำหรับ animated style
     aliveRef.current = true;
     posX.value = newX;
     translateX.value = 0;
@@ -289,8 +291,8 @@ export default function VocabBubble({
     position: 'absolute' as const,
     left: posX.value,
     top: 0,
-    width: sizeRef.current,
-    height: sizeRef.current,
+    width: sizeValue.value,
+    height: sizeValue.value,
     zIndex: isVocab ? 40 : 5,
   }));
 

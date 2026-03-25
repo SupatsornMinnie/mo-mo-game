@@ -3,7 +3,7 @@ export const GAME_DURATION = 30; // seconds
 export const HINT_FREE_COUNT = 3;
 export const HINT_AD_MAX = 5;
 export const INTRO_DURATION = 3000; // ms
-export const SNAP_THRESHOLD = 40; // px — how close to slot to count as correct
+export const SNAP_THRESHOLD = 70; // px — how close to slot to count as correct
 
 // ===== Heart / Life System =====
 export const MAX_HEARTS = 5;

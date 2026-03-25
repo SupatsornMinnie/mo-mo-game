@@ -146,14 +146,51 @@ function CelebBubble({ index, sw, sh }: { index: number; sw: number; sh: number 
   );
 }
 
+// ─── LetterAnimItem — แยก component ออกมาเพื่อไม่ให้เรียก Hook ใน .map() ───
+function LetterAnimItem({
+  letterKey,
+  scale,
+  yVal,
+  size,
+}: {
+  letterKey: string;
+  scale: ReturnType<typeof useSharedValue<number>>;
+  yVal: ReturnType<typeof useSharedValue<number>>;
+  size: number;
+}) {
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { translateY: yVal.value }],
+  }));
+  return (
+    <Animated.View style={style}>
+      <Image
+        source={GAME_IMAGES.letters[letterKey]}
+        style={{ width: size, height: size }}
+        contentFit="contain"
+      />
+    </Animated.View>
+  );
+}
+
 // ─── Main ────────────────────────────────────────────────
 export default function CelebrationOverlay() {
   const { width: sw, height: sh } = useWindowDimensions();
 
   const appleScale = useSharedValue(0);
   const appleRotation = useSharedValue(0);
-  const letterScales = Array.from({ length: 5 }, () => useSharedValue(0));
-  const letterY = Array.from({ length: 5 }, () => useSharedValue(30));
+
+  // ❌ Array.from(() => useSharedValue()) ละเมิด Rules of Hooks
+  // ✅ ต้องเรียก useSharedValue ที่ top-level ทีละตัว
+  const ls0 = useSharedValue(0); const ls1 = useSharedValue(0);
+  const ls2 = useSharedValue(0); const ls3 = useSharedValue(0);
+  const ls4 = useSharedValue(0);
+  const letterScales = [ls0, ls1, ls2, ls3, ls4];
+
+  const ly0 = useSharedValue(30); const ly1 = useSharedValue(30);
+  const ly2 = useSharedValue(30); const ly3 = useSharedValue(30);
+  const ly4 = useSharedValue(30);
+  const letterY = [ly0, ly1, ly2, ly3, ly4];
+
   const bgOpacity = useSharedValue(0);
 
   const appleSize = Math.min(sw * 0.28, sh * 0.45, 180);
@@ -257,23 +294,17 @@ export default function CelebrationOverlay() {
 
       {/* ตัวอักษร APPLE ใต้แอปเปิ้ล */}
       <Animated.View style={styles.wordRow}>
-        {['A', 'P', 'P2', 'L', 'E'].map((key, i) => {
-          const charStyle = useAnimatedStyle(() => ({
-            transform: [
-              { scale: letterScales[i].value },
-              { translateY: letterY[i].value },
-            ],
-          }));
-          return (
-            <Animated.View key={i} style={charStyle}>
-              <Image
-                source={GAME_IMAGES.letters[key]}
-                style={{ width: letterSize, height: letterSize }}
-                contentFit="contain"
-              />
-            </Animated.View>
-          );
-        })}
+        {(['A', 'P', 'P2', 'L', 'E'] as const).map((key, i) => (
+          // ❌ useAnimatedStyle ใน .map() ละเมิด Rules of Hooks
+          // ✅ แยกออกเป็น LetterAnimItem component แทน
+          <LetterAnimItem
+            key={key}
+            letterKey={key}
+            scale={letterScales[i]}
+            yVal={letterY[i]}
+            size={letterSize}
+          />
+        ))}
       </Animated.View>
     </Animated.View>
   );

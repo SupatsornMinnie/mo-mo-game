@@ -1,16 +1,16 @@
-import React, { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
+import React, { useEffect } from "react";
+import { StyleSheet } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  useSharedValue,
+  runOnJS,
   useAnimatedStyle,
+  useSharedValue,
   withSpring,
   withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
-import { GAME_IMAGES, SNAP_THRESHOLD } from '../../utils/gameConfig';
+} from "react-native-reanimated";
+import { GAME_IMAGES } from "../../utils/gameConfig";
 
 interface WormCharacterProps {
   sw: number;
@@ -26,16 +26,23 @@ interface WormCharacterProps {
 }
 
 export default function WormCharacter({
-  sw, sh, initialX, initialY,
-  appleTargetX, appleTargetY, appleSize, appleRotation = 0,
-  onReturnApple, isActive,
+  sw,
+  sh,
+  initialX,
+  initialY,
+  appleTargetX,
+  appleTargetY,
+  appleSize,
+  appleRotation = 0,
+  onReturnApple,
+  isActive,
 }: WormCharacterProps) {
   // ใช้ขนาดเดียวกับ AppleDrop: width = appleSize * 0.7, height = appleSize * 0.5
   const wormWidth = appleSize * 0.7;
   const wormHeight = appleSize * 0.5;
 
-  const startX = initialX ?? (wormWidth + Math.random() * (sw - 2 * wormWidth));
-  const startY = initialY ?? (sh * 0.55 + Math.random() * (sh * 0.30));
+  const startX = initialX ?? wormWidth + Math.random() * (sw - 2 * wormWidth);
+  const startY = initialY ?? sh * 0.55 + Math.random() * (sh * 0.3);
 
   const translateX = useSharedValue(startX);
   const translateY = useSharedValue(startY);
@@ -59,14 +66,18 @@ export default function WormCharacter({
   const checkAppleDrop = () => {
     const cx = translateX.value + wormWidth / 2;
     const cy = translateY.value + wormHeight / 2;
-    const dx = cx - appleTargetX;
-    const dy = cy - appleTargetY;
+    const dx = cx - (appleTargetX - appleSize * 0.25); // **มุมซ้ายล่างของหนอน
+    const dy = cy - (appleTargetY + appleSize * 0.15); // **มุมซ้ายล่างของหนอน
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < appleSize * 0.7) {
       // ลากหนอนไปถึงแอปเปิ้ล → snap เข้า → ซ่อนหนอน → แอปเปิ้ลเต็มลูก
-      translateX.value = withTiming(appleTargetX - wormWidth / 2, { duration: 150 });
-      translateY.value = withTiming(appleTargetY - wormHeight / 2, { duration: 150 });
+      translateX.value = withTiming(appleTargetX - wormWidth / 2, {
+        duration: 150,
+      });
+      translateY.value = withTiming(appleTargetY - wormHeight / 2, {
+        duration: 150,
+      });
       scale.value = withTiming(0, { duration: 250 });
       opacity.value = withTiming(0, { duration: 250 });
       runOnJS(handleReturnApple)();
@@ -119,6 +130,6 @@ export default function WormCharacter({
 
 const styles = StyleSheet.create({
   worm: {
-    position: 'absolute',
+    position: "absolute",
   },
 });
