@@ -1,12 +1,32 @@
-import { useRef, useCallback, useEffect } from 'react';
 import { Audio } from 'expo-av';
-import { LETTER_SOUNDS, WORD_SOUND, SFX_SOUNDS } from '../utils/gameConfig';
+import { useCallback, useEffect, useRef } from 'react';
+import { LETTER_SOUNDS, SFX_SOUNDS, WORD_SOUND } from '../utils/gameConfig';
 
 export function useGameSounds() {
   const soundsRef = useRef<Map<string, Audio.Sound>>(new Map());
   const bgmRef = useRef<Audio.Sound | null>(null);
 
+  // Preload เสียงที่ใช้บ่อยตั้งแต่เริ่มเกม
   useEffect(() => {
+    const preload = async () => {
+      try {
+        // Preload เสียง apple word
+        const { sound: wordSound } = await Audio.Sound.createAsync(WORD_SOUND);
+        soundsRef.current.set('word_apple', wordSound);
+
+        // Preload เสียง win
+        const { sound: winSound } = await Audio.Sound.createAsync(SFX_SOUNDS.win);
+        soundsRef.current.set('sfx_win', winSound);
+
+        // Preload เสียง correct
+        const { sound: correctSound } = await Audio.Sound.createAsync(SFX_SOUNDS.correct);
+        soundsRef.current.set('sfx_correct', correctSound);
+      } catch (e) {
+        console.warn('Preload sounds error:', e);
+      }
+    };
+    preload();
+
     return () => {
       soundsRef.current.forEach((sound) => {
         sound.unloadAsync().catch(() => {});
@@ -22,13 +42,15 @@ export function useGameSounds() {
       if (existing) {
         await existing.setPositionAsync(0);
         await existing.playAsync();
-        return;
+        return existing;
       }
       const { sound } = await Audio.Sound.createAsync(source);
       soundsRef.current.set(key, sound);
       await sound.playAsync();
+      return sound;
     } catch (e) {
       console.warn('Sound play error:', key, e);
+      return null;
     }
   }, []);
 
@@ -56,7 +78,6 @@ export function useGameSounds() {
   // เพลงพื้นหลัง — loop
   const startBGM = useCallback(async () => {
     try {
-      // ตั้ง Audio Mode ก่อน — แก้ปัญหา AudioFocusNotAcquiredException
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         staysActiveInBackground: false,
@@ -90,13 +111,11 @@ export function useGameSounds() {
   // หยุดและ unload เสียง ทั้งหมด (BGM + SFX) — เรียกตอนออกจากหน้า
   const stopAllSounds = useCallback(async () => {
     try {
-      // หยุด BGM
       if (bgmRef.current) {
         await bgmRef.current.stopAsync().catch(() => {});
         await bgmRef.current.unloadAsync().catch(() => {});
         bgmRef.current = null;
       }
-      // หยุด SFX ทุกตัว
       const stops = Array.from(soundsRef.current.values()).map((s) =>
         s.stopAsync().catch(() => {}).then(() => s.unloadAsync().catch(() => {}))
       );
@@ -105,17 +124,30 @@ export function useGameSounds() {
     } catch (e) {}
   }, []);
 
-  // เล่นเสียง win ก่อน แล้วดีเลย์ 1 วิ ค่อยเล่นเสียงคำว่า "APPLE"
+  // ออกเสียง "Apple" ก่อน → รอจบ → เล่นเสียง win
   const playWordThenWin = useCallback(async () => {
     try {
-      playSFX('win');
-      setTimeout(() => {
-        playSound(WORD_SOUND, 'word_apple');
-      }, 1000); // ดีเลย์ 1 วินาที ค่อยพูดคำว่า APPLE
+      // เล่นเสียงคำว่า Apple (preloaded แล้ว)
+      await new Promise((r) => setTimeout(r, 1000));//รอ**1วินาที
+      const appleSound = await playSound(WORD_SOUND, 'word_apple');
+
+      if (appleSound) {
+        // รอให้เสียง apple จบจริงๆ
+        await new Promise<void>((resolve) => {
+          appleSound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              resolve();
+            }
+          });
+        });
+      }
+
+      // เล่นเสียง win หลัง apple จบ
+      await playSound(SFX_SOUNDS.win, 'sfx_win');
     } catch (e) {
       console.warn('WordThenWin error:', e);
     }
-  }, [playSound, playSFX]);
+  }, [playSound]);
 
   return { playLetterSound, playWordSound, playSFX, startBGM, stopBGM, stopAllSounds, playWordThenWin };
 }

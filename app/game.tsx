@@ -54,6 +54,7 @@ import GameOverlay from "../components/game/GameOverlay";
 import HintButton from "../components/game/HintButton";
 import TimerBar from "../components/game/TimerBar";
 import WormCharacter from "../components/game/WormCharacter";
+import BackButton from "../components/BackButton";
 
 type GamePhase =
   | "loading"
@@ -102,6 +103,7 @@ export default function GameScreen() {
     APPLE_LETTERS.map(() => false),
   );
   const [applePieceReturned, setApplePieceReturned] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [wormInitPos, setWormInitPos] = useState<{
     x: number;
     y: number;
@@ -248,9 +250,10 @@ export default function GameScreen() {
   // Start game when assets + hearts loaded
   useEffect(() => {
     if (loaded && heartsLoaded && phase === "loading") {
+      startBGM();
       setPhase(canPlay ? "intro" : "nohearts");
     }
-  }, [loaded, heartsLoaded, phase, canPlay]);
+  }, [loaded, heartsLoaded, phase, canPlay, startBGM]);
 
   // ถ้าหัวใจ regen ระหว่างรอ nohearts → เริ่มเกมอัตโนมัติ
   useEffect(() => {
@@ -259,45 +262,23 @@ export default function GameScreen() {
     }
   }, [phase, canPlay]);
 
-  // Check win condition: all letters + apple piece returned
-  useEffect(() => {
-    if (phase !== "playing") return;
-    const allPlaced = placedLetters.every(Boolean);
-    if (allPlaced && applePieceReturned) {
-      pauseTimer(); // หยุด timer ทันทีเมื่อชนะ ป้องกัน TIME'S UP ทับ
-      setPhase("celebration");
-      stopBGM();
-      // บันทึกคำศัพท์นี้ว่าเล่นชนะแล้ว
-      const vocabId = id ? parseInt(id, 10) : 1;
-      markCompleted(vocabId);
-      setTimeout(() => setPhase("victory"), 6500); // ค้าง celebration 6.5 วิ (+3 วิจากเดิม)
-    }
-  }, [
-    placedLetters,
-    applePieceReturned,
-    phase,
-    pauseTimer,
-    stopBGM,
-    playWordThenWin,
-    markCompleted,
-    id,
-  ]);
+  // Win condition เช็คใน handleLetterPlace + handleApplePieceReturn โดยตรงแล้ว
 
   // === Handlers ===
   const handleIntroComplete = useCallback(() => {
     setPhase("playing");
     startTimer();
-    startBGM();
+    //startBGM();
   }, [startTimer, startBGM]);
 
   const handleLetterPlace = useCallback(
     (letterIndex: number, slotIndex: number) => {
       playSFX("correct");
-      setPlacedLetters((prev) => {
-        const next = [...prev];
-        next[letterIndex] = true;
-        return next;
-      });
+
+      const nextPlaced = [...placedLetters];
+      nextPlaced[letterIndex] = true;
+      setPlacedLetters(nextPlaced);
+
       setLetterSlotMap((prev) => {
         const next = [...prev];
         next[letterIndex] = slotIndex;
@@ -309,8 +290,20 @@ export default function GameScreen() {
         return next;
       });
       if (highlightedSlot === slotIndex) setHighlightedSlot(null);
+
+      // ชนะทันที ไม่รอ useEffect
+      const allPlaced = nextPlaced.every(Boolean);
+      if (allPlaced && applePieceReturned) {
+        pauseTimer();
+        setPhase("celebration");
+        stopBGM();
+        playWordThenWin();
+        const vocabId = id ? parseInt(id, 10) : 1;
+        markCompleted(vocabId);
+        setTimeout(() => setPhase("victory"), 6500);
+      }
     },
-    [playSFX, highlightedSlot],
+    [playSFX, highlightedSlot, placedLetters, applePieceReturned, pauseTimer, stopBGM, playWordThenWin, markCompleted, id],
   );
 
   const handleWrongPlace = useCallback(() => {
@@ -348,7 +341,19 @@ export default function GameScreen() {
   const handleApplePieceReturn = useCallback(() => {
     playSFX("correct");
     setApplePieceReturned(true);
-  }, [playSFX]);
+
+    // เช็คชนะทันที (กรณี worm เป็นตัวสุดท้าย)
+    const allPlaced = placedLetters.every(Boolean);
+    if (allPlaced) {
+      pauseTimer();
+      setPhase("celebration");
+      stopBGM();
+      playWordThenWin();
+      const vocabId = id ? parseInt(id, 10) : 1;
+      markCompleted(vocabId);
+      setTimeout(() => setPhase("victory"), 6500);
+    }
+  }, [playSFX, placedLetters, pauseTimer, stopBGM, playWordThenWin, markCompleted, id]);
 
   const handleHint = useCallback(async () => {
     if (!canUseHint) return; // TODO: show ad prompt
@@ -373,6 +378,9 @@ export default function GameScreen() {
       setPhase("nohearts");
       return;
     }
+    // **เล่นเสียงhandleRetry
+    startBGM();
+
     setPhase("intro");
     setPlacedLetters(APPLE_LETTERS.map(() => false));
     setLetterSlotMap(APPLE_LETTERS.map(() => -1));
@@ -387,6 +395,7 @@ export default function GameScreen() {
     setScatterPositions(generateScatterPositions(sw, sh)); // สุ่มตำแหน่งใหม่!
     beepPlayedRef.current = false; // reset เสียง beep สำหรับรอบใหม่
     resetTimer();
+    setRetryKey((k) => k + 1);
   }, [resetTimer, sw, sh, canPlay]);
 
   //**poo up Home */
@@ -422,9 +431,7 @@ export default function GameScreen() {
         resizeMode="cover"
       >
         {/* Back Button */}
-        <Pressable style={styles.backBtn} onPress={handleHome}>
-          <Text style={styles.backText}>{"←"}</Text>
-        </Pressable>
+        <BackButton onPress={handleHome} />
 
         {/* Timer Bar — pre-render แต่ซ่อนตอน intro (absolute overlay ไม่กระทบ layout) */}
         {(phase === "intro" || phase === "playing") && (
@@ -597,6 +604,7 @@ export default function GameScreen() {
             pointerEvents={phase === "playing" ? "box-none" : "none"}
           >
             <WormCharacter
+              key={retryKey}
               sw={sw}
               sh={sh}
               initialX={wormInitPos?.x}
@@ -608,6 +616,18 @@ export default function GameScreen() {
               onReturnApple={handleApplePieceReturn}
               isActive={phase === "playing" && !applePieceReturned}
             />
+          </View>
+        )}
+
+        {/* Preload celebration images ซ่อนไว้ตอน playing เพื่อไม่ให้ค้างตอนชนะ */}
+        {phase === "playing" && (
+          <View style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+            <Image source={GAME_IMAGES.apple} style={{ width: 1, height: 1 }} />
+            <Image source={GAME_IMAGES.letters.A} style={{ width: 1, height: 1 }} />
+            <Image source={GAME_IMAGES.letters.P} style={{ width: 1, height: 1 }} />
+            <Image source={GAME_IMAGES.letters.P2} style={{ width: 1, height: 1 }} />
+            <Image source={GAME_IMAGES.letters.L} style={{ width: 1, height: 1 }} />
+            <Image source={GAME_IMAGES.letters.E} style={{ width: 1, height: 1 }} />
           </View>
         )}
 
@@ -674,11 +694,6 @@ const styles = StyleSheet.create({
     zIndex: 100,
     borderWidth: 2,
     borderColor: "#4A90D9",
-  },
-  backText: {
-    fontSize: 22,
-    color: "#4A90D9",
-    fontWeight: "700",
   },
   bittenApple: {
     position: "absolute",

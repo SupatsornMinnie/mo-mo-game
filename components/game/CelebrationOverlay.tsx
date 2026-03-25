@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -7,15 +7,12 @@ import Animated, {
   withDelay,
   withSequence,
   withTiming,
-  withRepeat,
   Easing,
-  runOnJS,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { Audio } from 'expo-av';
-import { GAME_IMAGES, LETTER_SOUNDS, SFX_SOUNDS, WORD_SOUND } from '../../utils/gameConfig';
+import { GAME_IMAGES } from '../../utils/gameConfig';
 
-// ─── สีฟอง (เหมือนหน้าแรก) ───────────────────────────
+// ─── สีฟอง ───────────────────────────
 const BUBBLE_COLORS = [
   { bg: 'rgba(173,216,230,0.45)', border: 'rgba(173,216,230,0.7)' },
   { bg: 'rgba(255,182,193,0.40)', border: 'rgba(255,182,193,0.65)' },
@@ -25,7 +22,7 @@ const BUBBLE_COLORS = [
   { bg: 'rgba(255,255,255,0.45)', border: 'rgba(255,255,255,0.65)' },
 ];
 
-// ─── Particle เหมือนหน้าแรก (เป็นลูกของฟอง) ──────────
+// ─── Particle (ลูกของฟอง) ──────────
 function BubbleParticle({ angle, color, popTime, totalCycle, bubbleSize }: {
   angle: number; color: string; popTime: number; totalCycle: number; bubbleSize: number;
 }) {
@@ -74,11 +71,10 @@ function BubbleParticle({ angle, color, popTime, totalCycle, bubbleSize }: {
   );
 }
 
-// ─── Bubble ลอยจากตรงไหนก็ได้แล้วแตก ─────────────────
+// ─── Bubble ลอยแล้วแตก ─────────────────
 function CelebBubble({ index, sw, sh }: { index: number; sw: number; sh: number }) {
   const size = 18 + Math.random() * 55;
   const startX = Math.random() * (sw - size);
-  // สุ่มตำแหน่ง Y เริ่มต้นทั่วจอ (ไม่ต้องลอยจาก bottom)
   const startY = Math.random() * sh;
   const colorIndex = index % BUBBLE_COLORS.length;
   const color = BUBBLE_COLORS[colorIndex];
@@ -87,14 +83,14 @@ function CelebBubble({ index, sw, sh }: { index: number; sw: number; sh: number 
   const bubbleOpacity = useSharedValue(0);
   const scale = useSharedValue(1);
 
-  const floatDist = sh * (0.3 + Math.random() * 0.5); // ลอยขึ้น 30-80% ของจอ
+  const floatDist = sh * (0.3 + Math.random() * 0.5);
   const floatDuration = 1500 + Math.random() * 2500;
-  const popAt = floatDuration * (0.5 + Math.random() * 0.4); // แตกสุ่มระหว่างทาง
+  const popAt = floatDuration * (0.5 + Math.random() * 0.4);
   const totalCycle = floatDuration + 300;
-  const delay = Math.random() * 1500;
+  // ฟองเริ่มทันที — สุ่ม delay แค่เล็กน้อยเพื่อกระจาย
+  const delay = Math.random() * 800;
 
   useEffect(() => {
-    // ปรากฏ → ลอยขึ้น → แตก
     bubbleOpacity.value = withDelay(delay,
       withSequence(
         withTiming(0.7, { duration: 400 }),
@@ -146,7 +142,7 @@ function CelebBubble({ index, sw, sh }: { index: number; sw: number; sh: number 
   );
 }
 
-// ─── LetterAnimItem — แยก component ออกมาเพื่อไม่ให้เรียก Hook ใน .map() ───
+// ─── LetterAnimItem ───
 function LetterAnimItem({
   letterKey,
   scale,
@@ -173,14 +169,13 @@ function LetterAnimItem({
 }
 
 // ─── Main ────────────────────────────────────────────────
+// เสียงจัดการโดย useGameSounds ใน game.tsx แล้ว — ไม่โหลดเสียงซ้ำที่นี่
 export default function CelebrationOverlay() {
   const { width: sw, height: sh } = useWindowDimensions();
 
   const appleScale = useSharedValue(0);
   const appleRotation = useSharedValue(0);
 
-  // ❌ Array.from(() => useSharedValue()) ละเมิด Rules of Hooks
-  // ✅ ต้องเรียก useSharedValue ที่ top-level ทีละตัว
   const ls0 = useSharedValue(0); const ls1 = useSharedValue(0);
   const ls2 = useSharedValue(0); const ls3 = useSharedValue(0);
   const ls4 = useSharedValue(0);
@@ -196,76 +191,24 @@ export default function CelebrationOverlay() {
   const appleSize = Math.min(sw * 0.28, sh * 0.45, 180);
   const letterSize = Math.min(sw * 0.09, sh * 0.15, 60);
 
-  const soundsRef = useRef<Audio.Sound[]>([]);
-
   useEffect(() => {
-    bgOpacity.value = withTiming(1, { duration: 300 });
+    // BG fade in
+    bgOpacity.value = withTiming(1, { duration: 200 });
 
-    // แอปเปิ้ลโผล่
-    appleScale.value = withDelay(100, withSequence(
-      withSpring(1.3, { damping: 4, stiffness: 150 }),
-      withSpring(1, { damping: 6 }),
-    ));
-    appleRotation.value = withDelay(100, withSequence(
-      withTiming(-10, { duration: 200 }),
-      withTiming(10, { duration: 200 }),
-      withTiming(0, { duration: 200 }),
-    ));
+    // แอปเปิ้ลโผล่ทันที — spring เร็ว
+    appleScale.value = withSpring(1, { damping: 12, stiffness: 300 });
+    appleRotation.value = withSequence(
+      withTiming(-10, { duration: 150 }),
+      withTiming(10, { duration: 150 }),
+      withTiming(0, { duration: 150 }),
+    );
 
-    // เสียง "apple" ก่อน → รอจบ → รอ 1 วิ → เล่น win
-    const playAppleThenWin = async () => {
-      try {
-        // โหลดเสียง apple
-        const { sound: appleSound } = await Audio.Sound.createAsync(WORD_SOUND);
-        soundsRef.current.push(appleSound);
-
-        // รอให้เสียง apple จบจริงๆ ผ่าน onPlaybackStatusUpdate
-        await new Promise<void>((resolve) => {
-          appleSound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              resolve();
-            }
-          });
-          appleSound.playAsync();
-        });
-
-        // รอเพิ่ม 1 วินาทีหลัง apple จบ
-        await new Promise((r) => setTimeout(r, 1000));
-
-        // เล่น win
-        const { sound: winSound } = await Audio.Sound.createAsync(SFX_SOUNDS.win);
-        soundsRef.current.push(winSound);
-        await winSound.playAsync();
-      } catch (e) {}
-    };
-    setTimeout(playAppleThenWin, 300);
-
-    // ตัวอักษร pop in ทีละตัว
-    const letterChars = ['A', 'P', 'P', 'L', 'E'];
+    // ตัวอักษร pop in ทีละตัว — เริ่มทันที
     letterScales.forEach((s, i) => {
-      const delay = 500 + i * 150;
-      s.value = withDelay(delay, withSequence(
-        withSpring(1.4, { damping: 4, stiffness: 200 }),
-        withSpring(1, { damping: 6 }),
-      ));
-      letterY[i].value = withDelay(delay, withSpring(0, { damping: 6, stiffness: 120 }));
-
-      // เสียงอ่านตัวอักษรทีละตัว
-      setTimeout(async () => {
-        try {
-          const src = LETTER_SOUNDS[letterChars[i]];
-          if (src) {
-            const { sound } = await Audio.Sound.createAsync(src);
-            soundsRef.current.push(sound);
-            await sound.playAsync();
-          }
-        } catch (e) {}
-      }, delay);
+      const delay = i * 100;
+      s.value = withDelay(delay, withSpring(1, { damping: 10, stiffness: 250 }));
+      letterY[i].value = withDelay(delay, withSpring(0, { damping: 10, stiffness: 200 }));
     });
-
-    return () => {
-      soundsRef.current.forEach(s => s.unloadAsync().catch(() => {}));
-    };
   }, []);
 
   const bgStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));
@@ -278,8 +221,8 @@ export default function CelebrationOverlay() {
 
   return (
     <Animated.View style={[styles.overlay, bgStyle]}>
-      {/* Bubble ลอยแตกเต็มจอเหมือนหน้าแรก — 45 ลูก */}
-      {Array.from({ length: 45 }).map((_, i) => (
+      {/* Bubble — ลดเหลือ 35 ลูก ลดภาระ mount */}
+      {Array.from({ length: 35 }).map((_, i) => (
         <CelebBubble key={`b-${i}`} index={i} sw={sw} sh={sh} />
       ))}
 
@@ -295,8 +238,6 @@ export default function CelebrationOverlay() {
       {/* ตัวอักษร APPLE ใต้แอปเปิ้ล */}
       <Animated.View style={styles.wordRow}>
         {(['A', 'P', 'P2', 'L', 'E'] as const).map((key, i) => (
-          // ❌ useAnimatedStyle ใน .map() ละเมิด Rules of Hooks
-          // ✅ แยกออกเป็น LetterAnimItem component แทน
           <LetterAnimItem
             key={key}
             letterKey={key}

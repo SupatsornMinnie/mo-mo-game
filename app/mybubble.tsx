@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useVocabProgress } from '../hooks/useVocabProgress';
 import { VOCAB_LIST, VocabItem } from '../utils/vocabConfig';
+import BackButton from "../components/BackButton";
 
 const NUM_COLUMNS = 3;
 
@@ -33,46 +34,38 @@ export default function MyBubbleScreen() {
     });
   }, [router]);
 
+  // แสดงเฉพาะคำที่ชนะแล้วเท่านั้น
+  const completedVocabs = VOCAB_LIST.filter((item) => isCompleted(item.id));
+
   const renderCard = useCallback(({ item }: { item: VocabItem }) => {
-    const done = isCompleted(item.id);
     return (
       <Pressable
         style={[styles.card, { width: cardSize, height: cardSize * 1.2 }]}
         onPress={() => handleCardPress(item)}
       >
-        <View style={[styles.cardInner, done && styles.cardDone]}>
-          {/* รูปการ์ด — แสดงเสมอ, ยังไม่ผ่านจะจางลง */}
+        <View style={[styles.cardInner, styles.cardDone]}>
+          {/* รูปการ์ด — แสดงเต็ม เพราะชนะแล้วทุกใบ */}
           <Image
             source={item.card}
             style={{
               width: cardSize * 0.82,
               height: cardSize * 0.82,
-              opacity: done ? 1 : 0.35,
             }}
             contentFit="contain"
           />
 
-          {/* Badge ✓ เมื่อผ่านด่าน */}
-          {done && (
-            <View style={styles.doneBadge}>
-              <Text style={styles.doneBadgeText}>✓</Text>
-            </View>
-          )}
+          {/* Badge ✓ มุมขวาบน */}
+          <View style={styles.doneBadge}>
+            <Text style={styles.doneBadgeText}>✓</Text>
+          </View>
 
-          {/* ป้าย "เล่นเลย" เมื่อยังไม่ผ่าน */}
-          {!done && (
-            <View style={styles.playBadge}>
-              <Text style={styles.playBadgeText}>เล่นเลย!</Text>
-            </View>
-          )}
-
-          <Text style={[styles.wordText, !done && styles.wordDim]}>
+          <Text style={styles.wordText}>
             {item.word}
           </Text>
         </View>
       </Pressable>
     );
-  }, [isCompleted, cardSize, handleCardPress]);
+  }, [cardSize, handleCardPress]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -80,9 +73,7 @@ export default function MyBubbleScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>←</Text>
-          </Pressable>
+          <BackButton onPress={() => router.back()} style={{ position: "relative", top: 0, left: 0 }} />
           <Text style={styles.title}>🫧 My Bubble</Text>
           <View style={styles.countBadge}>
             <Text style={styles.countText}>{totalCompleted} / {VOCAB_LIST.length}</Text>
@@ -101,9 +92,9 @@ export default function MyBubbleScreen() {
             : `สะสมแล้ว ${totalCompleted} คำ 🎉`}
         </Text>
 
-        {/* Grid — แสดงทุกคำ */}
+        {/* Grid — แสดงเฉพาะคำที่ชนะแล้ว */}
         <FlatList
-          data={VOCAB_LIST}
+          data={completedVocabs}
           keyExtractor={(item) => String(item.id)}
           numColumns={NUM_COLUMNS}
           renderItem={renderCard}

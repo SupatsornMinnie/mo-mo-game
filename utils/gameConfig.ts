@@ -75,7 +75,7 @@ export const SFX_SOUNDS = {
 export function calculateSlotPositions(sw: number, sh: number) {
   const letterCount = APPLE_LETTERS.length;
   const slotSize = Math.min(sw * 0.2, sh * 0.3, 130);
-  const gap = slotSize * -0.2; //ระยะห่างระหว่างตัวอักษร
+  const gap = slotSize * 0.2; //ระยะห่างระหว่างตัวอักษร
   const totalWidth = letterCount * slotSize + (letterCount - 1) * gap;
   const startX = (sw - totalWidth) / 2;
   const centerY = sh * 0.42; // ขยับขึ้น 20%

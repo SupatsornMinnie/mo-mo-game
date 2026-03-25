@@ -104,7 +104,7 @@ const EMPTY_COUNT = 20;
 export default function HomeScreen() {
   const { width: sw, height: sh } = useWindowDimensions();
   const router = useRouter();
-  const { totalCompleted, reload: reloadVocab } = useVocabProgress();
+  const { totalCompleted, isCompleted, reload: reloadVocab } = useVocabProgress();
 
   // อ่าน progress ใหม่ทุกครั้งที่กลับมาหน้า home
   useFocusEffect(useCallback(() => { reloadVocab(); }, [reloadVocab]));
@@ -337,8 +337,8 @@ export default function HomeScreen() {
           />
         ))}
 
-        {/* ===== Vocabulary Bubbles ===== */}
-        {VOCAB_BUBBLES.map((vocab, i) => (
+        {/* ===== Vocabulary Bubbles — ซ่อนคำที่ชนะแล้ว ===== */}
+        {VOCAB_BUBBLES.filter((vocab) => !isCompleted(vocab.id)).map((vocab, i) => (
           <VocabBubble
             key={`vocab-${vocab.id}`}
             source={vocab.image}
