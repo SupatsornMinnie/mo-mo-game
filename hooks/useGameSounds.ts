@@ -56,6 +56,13 @@ export function useGameSounds() {
   // เพลงพื้นหลัง — loop
   const startBGM = useCallback(async () => {
     try {
+      // ตั้ง Audio Mode ก่อน — แก้ปัญหา AudioFocusNotAcquiredException
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+      });
       if (bgmRef.current) {
         await bgmRef.current.setPositionAsync(0);
         await bgmRef.current.playAsync();

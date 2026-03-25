@@ -14,7 +14,7 @@ import { homeStyles } from "../styles/home.styles";
 import { useVocabProgress } from "../hooks/useVocabProgress";
 
 // ===== ภาพ =====
-const BG_HOME = require("../assets/home/bg1.jpg");
+const BG_HOME = require("../assets/home/bg2.jpg");
 const WHALE = require("../assets/home/blue_whale.webp");
 const JELLY1 = require("../assets/home/jelly_fish_1.webp");
 const JELLY2 = require("../assets/home/jelly_fish_2.webp");
@@ -123,35 +123,44 @@ export default function HomeScreen() {
     ),
   );
 
-  // === เล่นเพลงพื้นหลัง ===
-  useEffect(() => {
-    let mounted = true;
-    const startBGM = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-        });
-        const { sound } = await Audio.Sound.createAsync(BGM, {
-          isLooping: true,
-          volume: 0.3,
-        });
-        if (mounted) {
-          bgmRef.current = sound;
-          await sound.playAsync();
-        } else {
-          await sound.unloadAsync();
+  // === เล่นเพลงพื้นหลัง — หยุดตอนออกจากหน้า, เล่นต่อตอนกลับมา ===
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      const startBGM = async () => {
+        try {
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: false,
+          });
+          if (bgmRef.current) {
+            // กลับมาหน้านี้ → เล่นต่อ
+            await bgmRef.current.setPositionAsync(0);
+            await bgmRef.current.playAsync();
+          } else {
+            const { sound } = await Audio.Sound.createAsync(BGM, {
+              isLooping: true,
+              volume: 0.3,
+            });
+            if (mounted) {
+              bgmRef.current = sound;
+              await sound.playAsync();
+            } else {
+              await sound.unloadAsync();
+            }
+          }
+        } catch (e) {
+          console.warn("BGM error:", e);
         }
-      } catch (e) {
-        console.warn("BGM error:", e);
-      }
-    };
-    startBGM();
-    return () => {
-      mounted = false;
-      bgmRef.current?.unloadAsync();
-    };
-  }, []);
+      };
+      startBGM();
+      // ออกจากหน้านี้ → หยุดเพลง
+      return () => {
+        mounted = false;
+        bgmRef.current?.stopAsync();
+      };
+    }, [])
+  );
 
   // === เล่นเสียง SFX ===
   const playSound = useCallback(async (type: "break" | "lock" | "bounce") => {
@@ -230,7 +239,7 @@ export default function HomeScreen() {
     {
       source: WHALE,
       x: sw * 0.58,
-      y: sh * -0.18,
+      y: sh * -0.10, //ความห่างหน้าจอของวาฬ
       size: whaleSize,
       floatAmount: 10,
       floatDuration: 3000,
@@ -254,7 +263,7 @@ export default function HomeScreen() {
     {
       source: JELLY3,
       x: sw * 0.28,
-      y: sh * 0.28,
+      y: sh * 0.18,
       size: jellySmSize,
       floatAmount: 8,
       floatDuration: 2200,

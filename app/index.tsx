@@ -414,7 +414,8 @@ export default function SplashScreen() {
         }
       } catch (e) {
         console.warn('BGM error:', e);
-        goHome(); // ถ้าเล่นเพลงไม่ได้ ข้ามไป home เลย
+        // ถ้าเล่นเพลงไม่ได้ รอ 5 วินาทีแล้วค่อยไป home
+        setTimeout(goHome, 5000);
       }
     };
 

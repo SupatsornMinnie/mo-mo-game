@@ -63,7 +63,7 @@ export default function WormCharacter({
     const dy = cy - appleTargetY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < appleSize * 0.4) {
+    if (dist < appleSize * 0.7) {
       // ลากหนอนไปถึงแอปเปิ้ล → snap เข้า → ซ่อนหนอน → แอปเปิ้ลเต็มลูก
       translateX.value = withTiming(appleTargetX - wormWidth / 2, { duration: 150 });
       translateY.value = withTiming(appleTargetY - wormHeight / 2, { duration: 150 });

@@ -1,5 +1,5 @@
 // ===== Game Constants =====
-export const GAME_DURATION = 60; // seconds
+export const GAME_DURATION = 30; // seconds
 export const HINT_FREE_COUNT = 3;
 export const HINT_AD_MAX = 5;
 export const INTRO_DURATION = 3000; // ms
@@ -75,7 +75,7 @@ export const SFX_SOUNDS = {
 export function calculateSlotPositions(sw: number, sh: number) {
   const letterCount = APPLE_LETTERS.length;
   const slotSize = Math.min(sw * 0.2, sh * 0.3, 130);
-  const gap = slotSize * 0.2;
+  const gap = slotSize * -0.2; //ระยะห่างระหว่างตัวอักษร
   const totalWidth = letterCount * slotSize + (letterCount - 1) * gap;
   const startX = (sw - totalWidth) / 2;
   const centerY = sh * 0.42; // ขยับขึ้น 20%
@@ -89,47 +89,53 @@ export function calculateSlotPositions(sw: number, sh: number) {
 
 /** Generate random scattered positions + rotation */
 export function generateScatterPositions(sw: number, sh: number) {
-  const actualSize = Math.min(sw * 0.2, sh * 0.3, 130);
-  // margin ต้องมากพอ: ตัวอักษร position คือ top-left ของกล่อง
-  // ดังนั้นต้อง margin อย่างน้อย = actualSize เพื่อไม่ให้ตกขอบขวา/ล่าง
-  const marginLeft = actualSize * 0.5;
-  const marginRight = actualSize * 1.5; // ตัวอักษรมีขนาด → ต้องเว้นมากกว่า
-  const marginTop = actualSize * 0.3;
-  const marginBottom = actualSize * 1.3;
+  // ขนาด letter ปรับให้เล็กลงใน landscape (sh น้อย)
+  const actualSize = Math.min(sw * 0.16, sh * 0.22, 110);
+
+  // margin คงที่ ไม่ผูกกับ actualSize เพื่อกันล้น
+  const mL = 20;
+  const mR = 20;
+  const mT = 50;         // เว้น timer bar
+  const mB = 20;
+
+  const safeW = sw - mL - mR - actualSize;
+  const safeH = sh - mT - mB - actualSize;
+
+  // แบ่ง 5 คอลัมน์ กระจายแนวนอน
+  const cols = APPLE_LETTERS.length;
+  const zoneW = safeW / cols;
+
   const positions: { x: number; y: number; rotation: number }[] = [];
 
-  // แบ่งพื้นที่จอเป็น zone ให้กระจายทั่ว ไม่กองกัน
-  const cols = 3;
-  const rows = 2;
-  const zoneW = (sw - marginLeft - marginRight) / cols;
-  const zoneH = (sh - marginTop - marginBottom) / rows;
-
-  for (let i = 0; i < APPLE_LETTERS.length; i++) {
+  for (let i = 0; i < cols; i++) {
     let x: number, y: number;
     let tries = 0;
 
-    // กระจายตาม zone เพื่อไม่ให้กองกัน
-    const col = i % cols;
-    const row = Math.floor(i / cols) % rows;
-
     do {
-      x = marginLeft + col * zoneW + Math.random() * (zoneW * 0.7);
-      y = marginTop + row * zoneH + Math.random() * (zoneH * 0.7);
+      // X — แต่ละตัวอยู่ในคอลัมน์ของตัวเอง
+      x = mL + i * zoneW + Math.random() * (zoneW * 0.85);
+
+      // Y — สลับบน/ล่างเพื่อกระจาย
+      if (i % 2 === 0) {
+        y = mT + Math.random() * (safeH * 0.45);       // บน
+      } else {
+        y = mT + safeH * 0.55 + Math.random() * (safeH * 0.45); // ล่าง
+      }
       tries++;
     } while (
-      tries < 30 &&
+      tries < 20 &&
       positions.some(
         (p) =>
-          Math.abs(p.x - x) < actualSize * 1.3 &&
-          Math.abs(p.y - y) < actualSize * 1.3,
+          Math.abs(p.x - x) < actualSize * 0.85 &&
+          Math.abs(p.y - y) < actualSize * 0.85
       )
     );
 
-    // Clamp ให้อยู่ในจออย่างแน่นอน
-    x = Math.max(marginLeft, Math.min(x, sw - marginRight));
-    y = Math.max(marginTop, Math.min(y, sh - marginBottom));
+    // Clamp เข้มงวด — ห้ามล้นขอบเลย
+    x = Math.max(mL, Math.min(x, sw - mR - actualSize));
+    y = Math.max(mT, Math.min(y, sh - mB - actualSize));
 
-    const rotation = Math.random() * 360 - 180; // สุ่ม 360 องศา
+    const rotation = Math.random() * 360 - 180;
     positions.push({ x, y, rotation });
   }
   return positions;

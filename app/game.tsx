@@ -3,12 +3,13 @@ import { View, Text, Pressable, ImageBackground, useWindowDimensions, ActivityIn
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming, runOnJS } from 'react-native-reanimated';
 
 import { useAssetPreloader } from '../hooks/useAssetPreloader';
 import { useGameSounds } from '../hooks/useGameSounds';
 import { useGameTimer } from '../hooks/useGameTimer';
 import { useHearts } from '../hooks/useHearts';
+import { useHints } from '../hooks/useHints';
 import { useVocabProgress } from '../hooks/useVocabProgress';
 import {
   APPLE_LETTERS,
@@ -56,7 +57,8 @@ export default function GameScreen() {
   const [applePieceReturned, setApplePieceReturned] = useState(false);
   const [wormInitPos, setWormInitPos] = useState<{ x: number; y: number } | null>(null);
   const [appleRotationAngle, setAppleRotationAngle] = useState(0);
-  const [freeHints, setFreeHints] = useState(HINT_FREE_COUNT);
+  const { hintsLeft, canUseHint, useHint: consumeHint } = useHints();
+  const freeHints = hintsLeft;
   const [highlightedSlot, setHighlightedSlot] = useState<number | null>(null);
   const [highlightApple, setHighlightApple] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -101,6 +103,13 @@ export default function GameScreen() {
   const appleCtxY = useSharedValue(0);
   const appleScale = useSharedValue(1);
 
+  // ตำแหน่งจริงของแอปเปิ้ล (หลังลาก)
+  const [appleRealPos, setAppleRealPos] = useState<{ x: number; y: number } | null>(null);
+
+  const updateAppleRealPos = useCallback((tx: number, ty: number) => {
+    setAppleRealPos({ x: appleTargetX + tx, y: appleTargetY + ty });
+  }, [appleTargetX, appleTargetY]);
+
   const applePanGesture = useMemo(() => Gesture.Pan()
     .onStart(() => {
       appleCtxX.value = appleTransX.value;
@@ -113,7 +122,8 @@ export default function GameScreen() {
     })
     .onEnd(() => {
       appleScale.value = withSpring(1);
-    }), []);
+      runOnJS(updateAppleRealPos)(appleTransX.value, appleTransY.value);
+    }), [updateAppleRealPos]);
 
   const appleAnimStyle = useAnimatedStyle(() => ({
     transform: [
@@ -192,7 +202,6 @@ export default function GameScreen() {
       pauseTimer(); // หยุด timer ทันทีเมื่อชนะ ป้องกัน TIME'S UP ทับ
       setPhase('celebration');
       stopBGM();
-      playWordThenWin();
       // บันทึกคำศัพท์นี้ว่าเล่นชนะแล้ว
       const vocabId = id ? parseInt(id, 10) : 1;
       markCompleted(vocabId);
@@ -267,24 +276,23 @@ export default function GameScreen() {
     setApplePieceReturned(true);
   }, [playSFX]);
 
-  const handleHint = useCallback(() => {
-    if (freeHints <= 0) return; // TODO: show ad prompt
-    // Find first unplaced letter
+  const handleHint = useCallback(async () => {
+    if (!canUseHint) return; // TODO: show ad prompt
     const idx = placedLetters.findIndex((p) => !p);
     if (idx === -1) {
-      // ตัวอักษรครบแล้ว — ถ้าหนอนยังไม่กลับ ให้ไฮไลต์แอปเปิ้ล
       if (!applePieceReturned) {
-        setFreeHints((prev) => prev - 1);
+        const ok = await consumeHint();
+        if (!ok) return;
         setHighlightApple(true);
         setTimeout(() => setHighlightApple(false), 3000);
       }
       return;
     }
-    setFreeHints((prev) => prev - 1);
+    const ok = await consumeHint();
+    if (!ok) return;
     setHighlightedSlot(idx);
-    // Clear highlight after 3 seconds
     setTimeout(() => setHighlightedSlot(null), 3000);
-  }, [freeHints, placedLetters, applePieceReturned]);
+  }, [canUseHint, placedLetters, applePieceReturned, consumeHint]);
 
   const handleRetry = useCallback(() => {
     if (!canPlay) { setPhase('nohearts'); return; }
@@ -293,7 +301,6 @@ export default function GameScreen() {
     setLetterSlotMap(APPLE_LETTERS.map(() => -1));
     setFilledSlots(APPLE_LETTERS.map(() => false));
     setApplePieceReturned(false);
-    setFreeHints(HINT_FREE_COUNT);
     setHighlightedSlot(null);
     setHighlightApple(false);
     setShowCountdown(false);
@@ -461,8 +468,8 @@ export default function GameScreen() {
               sh={sh}
               initialX={wormInitPos?.x}
               initialY={wormInitPos?.y}
-              appleTargetX={appleTargetX}
-              appleTargetY={appleTargetY}
+              appleTargetX={appleRealPos ? appleRealPos.x : appleTargetX}
+              appleTargetY={appleRealPos ? appleRealPos.y : appleTargetY}
               appleSize={appleDisplaySize}
               appleRotation={appleRotationAngle}
               onReturnApple={handleApplePieceReturn}
