@@ -394,9 +394,12 @@ export default function GameScreen() {
     setWormInitPos(null);
     setScatterPositions(generateScatterPositions(sw, sh)); // สุ่มตำแหน่งใหม่!
     beepPlayedRef.current = false; // reset เสียง beep สำหรับรอบใหม่
+    setApplePieceReturned(false); // รีเซ็ตสถานะการคืนแอปเปิ้ล
+    setWormInitPos(null);         // ล้างตำแหน่งเริ่มต้นของหนอนเพื่อให้คำนวณใหม่
+    setAppleRealPos(null);        // ล้างตำแหน่งแอปเปิ้ลที่ผู้เล่นเคยลากค้างไว้
     resetTimer();
     setRetryKey((k) => k + 1);
-  }, [resetTimer, sw, sh, canPlay]);
+  }, [resetTimer, sw, sh, canPlay,startBGM]);
 
   //**poo up Home */
   const handleHome = useCallback(async () => {
