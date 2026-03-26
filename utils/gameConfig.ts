@@ -1,13 +1,13 @@
 // ===== Game Constants =====
 export const GAME_DURATION = 30; // seconds
 export const HINT_FREE_COUNT = 3;
-export const HINT_AD_MAX = 5;
+export const HINT_AD_MAX = 6;
 export const INTRO_DURATION = 3000; // ms
 export const SNAP_THRESHOLD = 70; // px — how close to slot to count as correct
 
 // ===== Heart / Life System =====
 export const MAX_HEARTS = 5;
-export const HEART_REGEN_MS = 0.5 * 60 * 1000; // 5 นาทีต่อ 1 หัวใจ
+export const HEART_REGEN_MS = 0.5 * 60 * 1000; // 5 นาทีต่อ 1 หัวใจ อยากได้ 15 นาที แก้ 0.5 เป็น 15
 
 // ===== Word Data =====
 export interface LetterData {
@@ -67,6 +67,7 @@ export const SFX_SOUNDS = {
   clockBeep: require("../assets/sounds/clock_beep.wav"),
   win: require("../assets/sounds/win.wav"),
   lose: require("../assets/sounds/lose.mp3"),
+  bubblePop: require("../assets/sounds/bubble-pop.wav"),
 };
 
 // ===== Position Helpers =====
@@ -75,7 +76,7 @@ export const SFX_SOUNDS = {
 export function calculateSlotPositions(sw: number, sh: number) {
   const letterCount = APPLE_LETTERS.length;
   const slotSize = Math.min(sw * 0.2, sh * 0.3, 130);
-  const gap = slotSize * 0.2; //ระยะห่างระหว่างตัวอักษร
+  const gap = slotSize * -0.15; //**ระยะห่างระหว่างตัวอักษร ยิ่งติดลบยิ่งชิด
   const totalWidth = letterCount * slotSize + (letterCount - 1) * gap;
   const startX = (sw - totalWidth) / 2;
   const centerY = sh * 0.42; // ขยับขึ้น 20%
@@ -95,7 +96,7 @@ export function generateScatterPositions(sw: number, sh: number) {
   // margin คงที่ ไม่ผูกกับ actualSize เพื่อกันล้น
   const mL = 20;
   const mR = 20;
-  const mT = 50;         // เว้น timer bar
+  const mT = 50; // เว้น timer bar
   const mB = 20;
 
   const safeW = sw - mL - mR - actualSize;
@@ -117,7 +118,7 @@ export function generateScatterPositions(sw: number, sh: number) {
 
       // Y — สลับบน/ล่างเพื่อกระจาย
       if (i % 2 === 0) {
-        y = mT + Math.random() * (safeH * 0.45);       // บน
+        y = mT + Math.random() * (safeH * 0.45); // บน
       } else {
         y = mT + safeH * 0.55 + Math.random() * (safeH * 0.45); // ล่าง
       }
@@ -127,7 +128,7 @@ export function generateScatterPositions(sw: number, sh: number) {
       positions.some(
         (p) =>
           Math.abs(p.x - x) < actualSize * 0.85 &&
-          Math.abs(p.y - y) < actualSize * 0.85
+          Math.abs(p.y - y) < actualSize * 0.85,
       )
     );
 

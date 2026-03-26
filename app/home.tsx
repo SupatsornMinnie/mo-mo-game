@@ -1,5 +1,5 @@
 import { Audio } from "expo-av";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
 import {
   ImageBackground,
@@ -10,8 +10,9 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import SeaCreature from "../components/SeaCreature";
 import VocabBubble, { BubbleInfo } from "../components/VocabBubble";
-import { homeStyles } from "../styles/home.styles";
 import { useVocabProgress } from "../hooks/useVocabProgress";
+import { homeStyles } from "../styles/home.styles";
+import { playBubblePop } from "../utils/playBubblePop";
 
 // ===== ภาพ =====
 const BG_HOME = require("../assets/home/bg2.jpg");
@@ -46,14 +47,14 @@ const VOCAB_BUBBLES = [
     word: "Apple",
     image: require("../assets/vocabulary/1apple/bubble_apple.webp"),
     locked: false,
-    hasGame: true,   // เกมสร้างแล้ว → ไป /game
+    hasGame: true, // เกมสร้างแล้ว → ไป /game
   },
   {
     id: 2,
     word: "Ant",
     image: require("../assets/vocabulary/2ant/bubble_ant.webp"),
     locked: false,
-    hasGame: false,  // ยังไม่ได้สร้าง → ไป /vocab-placeholder
+    hasGame: false, // ยังไม่ได้สร้าง → ไป /vocab-placeholder
   },
   {
     id: 3,
@@ -104,10 +105,18 @@ const EMPTY_COUNT = 20;
 export default function HomeScreen() {
   const { width: sw, height: sh } = useWindowDimensions();
   const router = useRouter();
-  const { totalCompleted, isCompleted, reload: reloadVocab } = useVocabProgress();
+  const {
+    totalCompleted,
+    isCompleted,
+    reload: reloadVocab,
+  } = useVocabProgress();
 
   // อ่าน progress ใหม่ทุกครั้งที่กลับมาหน้า home
-  useFocusEffect(useCallback(() => { reloadVocab(); }, [reloadVocab]));
+  useFocusEffect(
+    useCallback(() => {
+      reloadVocab();
+    }, [reloadVocab]),
+  );
   const bgmRef = useRef<Audio.Sound | null>(null);
   const sfxCache = useRef<{ [key: string]: Audio.Sound | null }>({});
 
@@ -159,7 +168,7 @@ export default function HomeScreen() {
         mounted = false;
         bgmRef.current?.stopAsync();
       };
-    }, [])
+    }, []),
   );
 
   // === เล่นเสียง SFX ===
@@ -229,7 +238,7 @@ export default function HomeScreen() {
   }, []);
 
   // สัตว์ทะเล
-  const whaleSize = Math.min(sw * 0.3, 320);
+  const whaleSize = Math.min(sw * 0.4, 320);
   const jellyBigSize = Math.min(sw * 0.13, 150);
   const jellyMedSize = Math.min(sw * 0.1, 120);
   const jellySmSize = Math.min(sw * 0.08, 95);
@@ -238,8 +247,8 @@ export default function HomeScreen() {
   const creatures = [
     {
       source: WHALE,
-      x: sw * 0.58,
-      y: sh * -0.10, //ความห่างหน้าจอของวาฬ
+      x: sw * 0.5,
+      y: sh * -0.1, //**ความห่างหน้าจอของวาฬ
       size: whaleSize,
       floatAmount: 10,
       floatDuration: 3000,
@@ -280,6 +289,7 @@ export default function HomeScreen() {
 
   const handleVocabPop = useCallback(
     (vocab: (typeof VOCAB_BUBBLES)[0]) => {
+      playBubblePop();
       // เกมสร้างแล้ว → ไป /game, ยังไม่ได้สร้าง → ไป /vocab-placeholder
       const pathname = vocab.hasGame ? "/game" : "/vocab-placeholder";
       router.push({
@@ -291,9 +301,9 @@ export default function HomeScreen() {
   );
 
   const handleMyBubble = useCallback(() => {
-    playSound("bounce");
+    playBubblePop();
     router.push("/mybubble");
-  }, [router, playSound]);
+  }, [router]);
 
   return (
     <GestureHandlerRootView style={homeStyles.container}>
@@ -338,26 +348,28 @@ export default function HomeScreen() {
         ))}
 
         {/* ===== Vocabulary Bubbles — ซ่อนคำที่ชนะแล้ว ===== */}
-        {VOCAB_BUBBLES.filter((vocab) => !isCompleted(vocab.id)).map((vocab, i) => (
-          <VocabBubble
-            key={`vocab-${vocab.id}`}
-            source={vocab.image}
-            screenW={sw}
-            screenH={sh}
-            index={i + EMPTY_COUNT}
-            isVocab={true}
-            isLocked={vocab.locked}
-            onPop={() => handleVocabPop(vocab)}
-            onPlaySound={(t) => playSound(t)}
-            minSize={sw * 0.11}
-            maxSize={sw * 0.18}
-            bubbleRef={
-              vocabBubbleRefs.current[
-                i
-              ] as React.MutableRefObject<BubbleInfo | null>
-            }
-          />
-        ))}
+        {VOCAB_BUBBLES.filter((vocab) => !isCompleted(vocab.id)).map(
+          (vocab, i) => (
+            <VocabBubble
+              key={`vocab-${vocab.id}`}
+              source={vocab.image}
+              screenW={sw}
+              screenH={sh}
+              index={i + EMPTY_COUNT}
+              isVocab={true}
+              isLocked={vocab.locked}
+              onPop={() => handleVocabPop(vocab)}
+              onPlaySound={(t) => playSound(t)}
+              minSize={sw * 0.11}
+              maxSize={sw * 0.18}
+              bubbleRef={
+                vocabBubbleRefs.current[
+                  i
+                ] as React.MutableRefObject<BubbleInfo | null>
+              }
+            />
+          ),
+        )}
 
         {/* ===== My Bubble — มุมขวาบน (zIndex สูงสุด) ===== */}
         <Pressable style={homeStyles.myBubbleBtn} onPress={handleMyBubble}>

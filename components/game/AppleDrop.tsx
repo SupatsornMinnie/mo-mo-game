@@ -45,8 +45,8 @@ export default function AppleDrop({
   const appleSize = Math.min(Math.max(sw * 0.35, 120), sh * 0.38, 230);
   const letterSize = slotPositions[0]?.size || 50;
 
-  // สุ่มมุมเอียงแอปเปิ้ลไม่เกิน ±45°
-  const appleRotationAngle = useRef(Math.random() * 90 - 45).current;
+  // **สุ่มมุมเอียงแอปเปิ้ลไม่เกิน ±90°
+  const appleRotationAngle = useRef(Math.random() * 180 - 90).current;
 
   const appleY = useSharedValue(-sh * 0.9);
   const appleScale = useSharedValue(1);
@@ -71,6 +71,7 @@ export default function AppleDrop({
   const wormY = useSharedValue(sh * 0.85);
   const wormOpacity = useSharedValue(0);
   const wormScale = useSharedValue(0.8);
+  const wormRotation = useSharedValue(0);
 
   const soundsListRef = useRef<Audio.Sound[]>([]);
   const playSound = async (sfx: any) => {
@@ -155,6 +156,12 @@ export default function AppleDrop({
     );
 
     // === Phase 4: หนอนกัดแอปเปิ้ล → bitten + เปลี่ยนเป็น worm_run ===
+    // หนอนค่อย ๆ เอียงตามแอปเปิ้ลตอนวิ่งหนี
+    wormRotation.value = withDelay(
+      wormBiteTime,
+      withTiming(appleRotationAngle, { duration: wormRunDuration * 0.8 }),
+    );
+
     setTimeout(() => {
       setShowBitten(true);
       setWormAlert(true);
@@ -315,6 +322,7 @@ export default function AppleDrop({
       { translateX: wormX.value },
       { translateY: wormY.value },
       { scale: wormScale.value },
+      { rotate: `${wormRotation.value}deg` },
     ],
     opacity: wormOpacity.value,
   }));

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { playBubblePop } from '../utils/playBubblePop';
 import {
   View,
   Image,
@@ -382,6 +383,7 @@ export default function SplashScreen() {
   const goHome = useCallback(() => {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
+    playBubblePop();
     soundRef.current?.stopAsync();
     soundRef.current?.unloadAsync();
     router.replace('/home');

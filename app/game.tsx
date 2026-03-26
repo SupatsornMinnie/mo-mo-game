@@ -10,7 +10,6 @@ import React, {
 import {
   ActivityIndicator,
   ImageBackground,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -41,12 +40,13 @@ import {
   APPLE_LETTERS,
   GAME_IMAGES,
   calculateSlotPositions,
-  generateScatterPositions
+  generateScatterPositions,
 } from "../utils/gameConfig";
 
 import DraggableLetter from "../components/game/DraggableLetter";
 import LetterSlot from "../components/game/LetterSlot";
 // DraggableApplePiece removed — worm drags directly to apple
+import BackButton from "../components/BackButton";
 import AppleDrop from "../components/game/AppleDrop";
 import CelebrationOverlay from "../components/game/CelebrationOverlay";
 import CountdownNumber from "../components/game/CountdownNumber";
@@ -54,7 +54,6 @@ import GameOverlay from "../components/game/GameOverlay";
 import HintButton from "../components/game/HintButton";
 import TimerBar from "../components/game/TimerBar";
 import WormCharacter from "../components/game/WormCharacter";
-import BackButton from "../components/BackButton";
 
 type GamePhase =
   | "loading"
@@ -303,7 +302,17 @@ export default function GameScreen() {
         setTimeout(() => setPhase("victory"), 6500);
       }
     },
-    [playSFX, highlightedSlot, placedLetters, applePieceReturned, pauseTimer, stopBGM, playWordThenWin, markCompleted, id],
+    [
+      playSFX,
+      highlightedSlot,
+      placedLetters,
+      applePieceReturned,
+      pauseTimer,
+      stopBGM,
+      playWordThenWin,
+      markCompleted,
+      id,
+    ],
   );
 
   const handleWrongPlace = useCallback(() => {
@@ -341,7 +350,8 @@ export default function GameScreen() {
   const handleApplePieceReturn = useCallback(() => {
     playSFX("correct");
     setApplePieceReturned(true);
-
+    //**เซ็ทให้ apple กลับมาตั้งตรงหลัง worm snap */
+    setAppleRotationAngle(0);
     // เช็คชนะทันที (กรณี worm เป็นตัวสุดท้าย)
     const allPlaced = placedLetters.every(Boolean);
     if (allPlaced) {
@@ -353,7 +363,15 @@ export default function GameScreen() {
       markCompleted(vocabId);
       setTimeout(() => setPhase("victory"), 6500);
     }
-  }, [playSFX, placedLetters, pauseTimer, stopBGM, playWordThenWin, markCompleted, id]);
+  }, [
+    playSFX,
+    placedLetters,
+    pauseTimer,
+    stopBGM,
+    playWordThenWin,
+    markCompleted,
+    id,
+  ]);
 
   const handleHint = useCallback(async () => {
     if (!canUseHint) return; // TODO: show ad prompt
@@ -395,11 +413,11 @@ export default function GameScreen() {
     setScatterPositions(generateScatterPositions(sw, sh)); // สุ่มตำแหน่งใหม่!
     beepPlayedRef.current = false; // reset เสียง beep สำหรับรอบใหม่
     setApplePieceReturned(false); // รีเซ็ตสถานะการคืนแอปเปิ้ล
-    setWormInitPos(null);         // ล้างตำแหน่งเริ่มต้นของหนอนเพื่อให้คำนวณใหม่
-    setAppleRealPos(null);        // ล้างตำแหน่งแอปเปิ้ลที่ผู้เล่นเคยลากค้างไว้
+    setWormInitPos(null); // ล้างตำแหน่งเริ่มต้นของหนอนเพื่อให้คำนวณใหม่
+    setAppleRealPos(null); // ล้างตำแหน่งแอปเปิ้ลที่ผู้เล่นเคยลากค้างไว้
     resetTimer();
     setRetryKey((k) => k + 1);
-  }, [resetTimer, sw, sh, canPlay,startBGM]);
+  }, [resetTimer, sw, sh, canPlay, startBGM]);
 
   //**poo up Home */
   const handleHome = useCallback(async () => {
@@ -624,13 +642,35 @@ export default function GameScreen() {
 
         {/* Preload celebration images ซ่อนไว้ตอน playing เพื่อไม่ให้ค้างตอนชนะ */}
         {phase === "playing" && (
-          <View style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+          <View
+            style={{
+              position: "absolute",
+              width: 0,
+              height: 0,
+              overflow: "hidden",
+            }}
+          >
             <Image source={GAME_IMAGES.apple} style={{ width: 1, height: 1 }} />
-            <Image source={GAME_IMAGES.letters.A} style={{ width: 1, height: 1 }} />
-            <Image source={GAME_IMAGES.letters.P} style={{ width: 1, height: 1 }} />
-            <Image source={GAME_IMAGES.letters.P2} style={{ width: 1, height: 1 }} />
-            <Image source={GAME_IMAGES.letters.L} style={{ width: 1, height: 1 }} />
-            <Image source={GAME_IMAGES.letters.E} style={{ width: 1, height: 1 }} />
+            <Image
+              source={GAME_IMAGES.letters.A}
+              style={{ width: 1, height: 1 }}
+            />
+            <Image
+              source={GAME_IMAGES.letters.P}
+              style={{ width: 1, height: 1 }}
+            />
+            <Image
+              source={GAME_IMAGES.letters.P2}
+              style={{ width: 1, height: 1 }}
+            />
+            <Image
+              source={GAME_IMAGES.letters.L}
+              style={{ width: 1, height: 1 }}
+            />
+            <Image
+              source={GAME_IMAGES.letters.E}
+              style={{ width: 1, height: 1 }}
+            />
           </View>
         )}
 

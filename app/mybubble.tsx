@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { playBubblePop } from '../utils/playBubblePop';
 import { useVocabProgress } from '../hooks/useVocabProgress';
 import { VOCAB_LIST, VocabItem } from '../utils/vocabConfig';
 import BackButton from "../components/BackButton";
@@ -27,7 +28,7 @@ export default function MyBubbleScreen() {
   const cardSize = (sw - 48) / NUM_COLUMNS;
 
   const handleCardPress = useCallback((item: VocabItem) => {
-    // คลิกได้เสมอ — เพื่อเล่น หรือ เล่นซ้ำ
+    playBubblePop();
     router.push({
       pathname: item.route as any,
       params: { word: item.word, id: String(item.id) },
@@ -73,7 +74,7 @@ export default function MyBubbleScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <BackButton onPress={() => router.back()} style={{ position: "relative", top: 0, left: 0 }} />
+          <BackButton onPress={() => { playBubblePop(); router.back(); }} style={{ position: "relative", top: 0, left: 0 }} />
           <Text style={styles.title}>🫧 My Bubble</Text>
           <View style={styles.countBadge}>
             <Text style={styles.countText}>{totalCompleted} / {VOCAB_LIST.length}</Text>

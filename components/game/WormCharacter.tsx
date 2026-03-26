@@ -110,6 +110,7 @@ export default function WormCharacter({
       { translateX: translateX.value },
       { translateY: translateY.value },
       { scale: scale.value },
+      { rotate: `${appleRotation}deg` },
     ],
     opacity: opacity.value,
     zIndex: isDragging.value ? 100 : 30,

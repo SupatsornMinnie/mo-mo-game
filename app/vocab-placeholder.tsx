@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import BackButton from "../components/BackButton";
+import { playBubblePop } from '../utils/playBubblePop';
 
 export default function VocabPlaceholderScreen() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function VocabPlaceholderScreen() {
       <Text style={styles.word}>{word ?? '?'}</Text>
       <Text style={styles.subtitle}>Coming Soon...</Text>
       <Text style={styles.desc}>เกมนี้กำลังจะมาเร็ว ๆ นี้ 🚀</Text>
-      <BackButton onPress={() => router.push('/home')} />
+      <BackButton onPress={() => { playBubblePop(); router.push('/home'); }} />
     </View>
   );
 }
