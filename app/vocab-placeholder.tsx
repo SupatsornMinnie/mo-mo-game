@@ -14,7 +14,7 @@ export default function VocabPlaceholderScreen() {
       <Text style={styles.word}>{word ?? '?'}</Text>
       <Text style={styles.subtitle}>Coming Soon...</Text>
       <Text style={styles.desc}>เกมนี้กำลังจะมาเร็ว ๆ นี้ 🚀</Text>
-      <BackButton onPress={() => { playBubblePop(); router.push('/home'); }} />
+      <BackButton onPress={() => { playBubblePop(); router.back(); }} />
     </View>
   );
 }

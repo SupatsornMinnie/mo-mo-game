@@ -170,12 +170,25 @@ function LetterAnimItem({
 
 // ─── Main ────────────────────────────────────────────────
 // เสียงจัดการโดย useGameSounds ใน game.tsx แล้ว — ไม่โหลดเสียงซ้ำที่นี่
-export default function CelebrationOverlay() {
+
+interface CelebrationOverlayProps {
+  wordImage?: any;          // default: apple image
+  letterKeys?: string[];    // default: ['A','P','P2','L','E']
+}
+
+export default function CelebrationOverlay({
+  wordImage,
+  letterKeys,
+}: CelebrationOverlayProps = {}) {
   const { width: sw, height: sh } = useWindowDimensions();
+
+  const resolvedWordImage = wordImage ?? GAME_IMAGES.apple;
+  const resolvedLetterKeys = letterKeys ?? ['A', 'P', 'P2', 'L', 'E'];
 
   const appleScale = useSharedValue(0);
   const appleRotation = useSharedValue(0);
 
+  // สูงสุด 5 ตัวอักษร (shared values สร้างเสมอ แต่ใช้แค่บางตัว)
   const ls0 = useSharedValue(0); const ls1 = useSharedValue(0);
   const ls2 = useSharedValue(0); const ls3 = useSharedValue(0);
   const ls4 = useSharedValue(0);
@@ -192,10 +205,8 @@ export default function CelebrationOverlay() {
   const letterSize = Math.min(sw * 0.09, sh * 0.15, 60);
 
   useEffect(() => {
-    // BG fade in
     bgOpacity.value = withTiming(1, { duration: 200 });
 
-    // แอปเปิ้ลโผล่ทันที — spring เร็ว
     appleScale.value = withSpring(1, { damping: 12, stiffness: 300 });
     appleRotation.value = withSequence(
       withTiming(-10, { duration: 150 }),
@@ -203,10 +214,9 @@ export default function CelebrationOverlay() {
       withTiming(0, { duration: 150 }),
     );
 
-    // ตัวอักษร pop in ทีละตัว — เริ่มทันที
-    letterScales.forEach((s, i) => {
+    resolvedLetterKeys.forEach((_, i) => {
       const delay = i * 100;
-      s.value = withDelay(delay, withSpring(1, { damping: 10, stiffness: 250 }));
+      letterScales[i].value = withDelay(delay, withSpring(1, { damping: 10, stiffness: 250 }));
       letterY[i].value = withDelay(delay, withSpring(0, { damping: 10, stiffness: 200 }));
     });
   }, []);
@@ -221,23 +231,20 @@ export default function CelebrationOverlay() {
 
   return (
     <Animated.View style={[styles.overlay, bgStyle]}>
-      {/* Bubble — ลดเหลือ 35 ลูก ลดภาระ mount */}
       {Array.from({ length: 35 }).map((_, i) => (
         <CelebBubble key={`b-${i}`} index={i} sw={sw} sh={sh} />
       ))}
 
-      {/* แอปเปิ้ลใหญ่ตรงกลาง */}
       <Animated.View style={[styles.appleContainer, { marginTop: -sh * 0.05 }, appleStyle]}>
         <Image
-          source={GAME_IMAGES.apple}
+          source={resolvedWordImage}
           style={{ width: appleSize, height: appleSize }}
           contentFit="contain"
         />
       </Animated.View>
 
-      {/* ตัวอักษร APPLE ใต้แอปเปิ้ล */}
       <Animated.View style={styles.wordRow}>
-        {(['A', 'P', 'P2', 'L', 'E'] as const).map((key, i) => (
+        {resolvedLetterKeys.map((key, i) => (
           <LetterAnimItem
             key={key}
             letterKey={key}
