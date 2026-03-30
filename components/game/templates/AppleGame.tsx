@@ -1,16 +1,14 @@
 import React from "react";
-import { useLocalSearchParams } from "expo-router";
-import GameScreen, { type GameConfig } from "../components/game/GameScreen";
-import AppleDrop from "../components/game/AppleDrop";
-import WormCharacter from "../components/game/WormCharacter";
-import { APPLE_LETTERS, GAME_IMAGES } from "../utils/gameConfig";
+import GameScreen, { type GameConfig } from "../GameScreen";
+import AppleDrop from "../AppleDrop";
+import WormCharacter from "../WormCharacter";
+import { APPLE_LETTERS, GAME_IMAGES } from "../../../utils/gameConfig";
+import { type VocabItem } from "../../../utils/vocabConfig";
 
-export default function AppleGameScreen() {
-  const { word, id } = useLocalSearchParams<{ word: string; id: string }>();
-
+export default function AppleGame({ vocab }: { vocab: VocabItem }) {
   const config: GameConfig = {
-    id: id ? parseInt(id, 10) : 1,
-    word: word || "Apple",
+    id: vocab.id,
+    word: vocab.word,
     letters: APPLE_LETTERS,
     bgImage: GAME_IMAGES.bg,
 

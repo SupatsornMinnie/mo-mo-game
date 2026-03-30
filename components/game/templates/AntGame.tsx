@@ -1,6 +1,7 @@
 import React from "react";
 import GameScreen, { type GameConfig } from "../GameScreen";
 import SugarRoll from "../SugarRoll";
+import AntCharacter from "../AntCharacter";
 import { ANT_IMAGES, ANT_LETTERS } from "../../../utils/antConfig";
 import { GAME_IMAGES } from "../../../utils/gameConfig";
 import { type VocabItem } from "../../../utils/vocabConfig";
@@ -24,17 +25,27 @@ export default function AntGame({ vocab }: { vocab: VocabItem }) {
     ),
 
     returnPiece: {
-      pieceImage: ANT_IMAGES.sugarBreak2,
+      pieceImage: ANT_IMAGES.sugarBreak1,
       completedImage: ANT_IMAGES.sugar,
-      thiefImage: ANT_IMAGES.antCarrySugar,
+      thiefImage: ANT_IMAGES.sugarBreak2,
       thiefSize: 100,
-      thiefAutoNavigates: false,
-      snapMultiplier: 3,
+      thiefAutoNavigates: true,
     },
 
-    // Ant game: no auto-navigate thief — player drags sugar piece back to
-    // the broken sugar position. The ant just runs away during intro.
-    // No renderThief needed — the piece itself is the target.
+    renderThief: (props) => (
+      <AntCharacter
+        key={props.retryKey}
+        sw={props.sw}
+        sh={props.sh}
+        initialX={props.initialX}
+        initialY={props.initialY}
+        sugarTargetX={props.pieceTargetX}
+        sugarTargetY={props.pieceTargetY}
+        sugarSize={props.pieceSize}
+        onReturnSugar={props.onReturnPiece}
+        isActive={props.isActive}
+      />
+    ),
 
     celebrationImage: ANT_IMAGES.sugar,
     celebrationLetterKeys: ["A", "N", "T"],

@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { VOCAB_LIST } from '../../utils/vocabConfig';
+import AppleGame from '../../components/game/templates/AppleGame';
 import AntGame from '../../components/game/templates/AntGame';
 
 export default function GameById() {
@@ -15,10 +16,10 @@ export default function GameById() {
     );
   }
 
+  if (vocab.gameType === 'apple') return <AppleGame vocab={vocab} />;
   if (vocab.gameType === 'ant') return <AntGame vocab={vocab} />;
 
   // TODO: เพิ่ม gameType อื่นๆ ตรงนี้
-  // if (vocab.gameType === 'letter-drag') return <LetterDragGame vocab={vocab} />;
 
   return (
     <View style={styles.center}>

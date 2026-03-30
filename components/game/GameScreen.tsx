@@ -691,6 +691,27 @@ export default function GameScreen({ config }: { config: GameConfig }) {
             </View>
           )}
 
+        {/* Static thief (ant) — แสดงค้างตอน playing เมื่อไม่มี renderThief */}
+        {phase === "playing" &&
+          !pieceReturned &&
+          !config.renderThief &&
+          thiefPos &&
+          config.returnPiece.thiefImage && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Image
+                source={config.returnPiece.thiefImage}
+                style={{
+                  position: "absolute",
+                  left: thiefPos.x,
+                  top: thiefPos.y,
+                  width: config.returnPiece.thiefSize,
+                  height: config.returnPiece.thiefSize,
+                }}
+                contentFit="contain"
+              />
+            </View>
+          )}
+
         {/* Hint Button */}
         {phase === "playing" && (
           <HintButton

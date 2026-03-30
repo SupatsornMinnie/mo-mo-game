@@ -290,18 +290,12 @@ export default function HomeScreen() {
   const handleVocabPop = useCallback(
     (vocab: (typeof VOCAB_BUBBLES)[0]) => {
       playBubblePop();
-      // ยังไม่ได้สร้างเกม → ไป /vocab-placeholder
       if (!vocab.hasGame) {
         router.push({ pathname: "/vocab-placeholder", params: { word: vocab.word, id: String(vocab.id) } });
         return;
       }
-      // Apple (id=1) ใช้ /game route
-      if (vocab.id === 1) {
-        router.push({ pathname: "/game", params: { word: vocab.word, id: String(vocab.id) } });
-        return;
-      }
-      // เกมอื่นๆ ใช้ /games/[id] route
-      router.push({ pathname: `/games/${vocab.id}` as any, params: { word: vocab.word } });
+      // ทุกเกมใช้ /games/[id] route เดียวกัน
+      router.push({ pathname: `/games/${vocab.id}` as any });
     },
     [router],
   );

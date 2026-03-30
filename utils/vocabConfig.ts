@@ -18,7 +18,7 @@ export const VOCAB_LIST: VocabItem[] = [
     word: 'Apple',
     card:     require('../assets/vocabulary/1apple/apple_card.png'),
     bubble:   require('../assets/vocabulary/1apple/bubble_apple.webp'),
-    route:    '/game',
+    route:    '/games/1',
     gameType: 'apple',
   },
   {
