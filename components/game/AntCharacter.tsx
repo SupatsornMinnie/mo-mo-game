@@ -1,14 +1,14 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import React, { useEffect, useRef } from "react";
-import { StyleSheet } from "react-native";
+import React, { useEffect } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  type SharedValue,
+  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -26,8 +26,150 @@ interface AntCharacterProps {
   isActive: boolean;
 }
 
-const ANT_COUNT = 5;
-const ANT_SPACING = 0.09; // ระยะห่างระหว่างมดแต่ละตัว (% ของ sw)
+const ANT_COUNT = 10;
+const ANT_SPACING = 0.1; // ** ระยะห่างระหว่างมดแต่ละตัว (% ของหน้าจอ)
+const CYCLE_DURATION = 5000; // ** ความเร็วมด: ลด = เร็ว, เพิ่ม = ช้า (ms/รอบ)
+
+// ─── มดลากได้แต่ละตัว — แต่ละตัวมี offset อิสระ loop เอง ───
+function DraggableMarchingAnt({
+  sw,
+  antWidth,
+  antHeight,
+  rowY,
+  marchOffset,
+  hasSugar,
+  sugarPieceSize,
+  sugarTargetX,
+  sugarTargetY,
+  sugarSize,
+  onSnapSugar,
+  isActive,
+}: {
+  sw: number;
+  antWidth: number;
+  antHeight: number;
+  rowY: number;
+  marchOffset: SharedValue<number>;
+  hasSugar: boolean;
+  sugarPieceSize: number;
+  sugarTargetX: number;
+  sugarTargetY: number;
+  sugarSize: number;
+  onSnapSugar: () => void;
+  isActive: boolean;
+}) {
+  const transX = useSharedValue(0);
+  const transY = useSharedValue(0);
+  const ctxX = useSharedValue(0);
+  const ctxY = useSharedValue(0);
+  const antScale = useSharedValue(1);
+  const isDragging = useSharedValue(false);
+  const sugarVisible = useSharedValue(1);
+
+  // แต่ละมดวน loop อิสระ: หลุดซ้ายปั๊บ → โผล่ขวาทันที
+  const getMarchX = (offset: number) => {
+    "worklet";
+    const range = sw + antWidth;
+    let x = sw + offset;
+    x = ((x % range) + range) % range;
+    return x;
+  };
+
+  const handleSnap = () => {
+    onSnapSugar();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const checkRelease = () => {
+    if (hasSugar && sugarVisible.value > 0.5) {
+      const marchX = getMarchX(marchOffset.value);
+      const cx = marchX + transX.value + antWidth / 2;
+      const cy = rowY - sugarPieceSize * 0.1 + transY.value;
+      const dx = cx - sugarTargetX;
+      const dy = cy - sugarTargetY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < sugarSize * 0.6) {
+        sugarVisible.value = withTiming(0, { duration: 300 });
+        transX.value = withSpring(0);
+        transY.value = withSpring(0);
+        antScale.value = withSpring(1);
+        runOnJS(handleSnap)();
+        return;
+      }
+    }
+    transX.value = withSpring(0);
+    transY.value = withSpring(0);
+    antScale.value = withSpring(1);
+  };
+
+  const panGesture = Gesture.Pan()
+    .enabled(isActive)
+    .onStart(() => {
+      ctxX.value = transX.value;
+      ctxY.value = transY.value;
+      isDragging.value = true;
+      antScale.value = withSpring(1.15);
+      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+    })
+    .onUpdate((e) => {
+      transX.value = ctxX.value + e.translationX;
+      transY.value = ctxY.value + e.translationY;
+    })
+    .onEnd(() => {
+      isDragging.value = false;
+      runOnJS(checkRelease)();
+    });
+
+  const antAnimStyle = useAnimatedStyle(() => {
+    const marchX = getMarchX(marchOffset.value);
+    return {
+      transform: [
+        { translateX: marchX + transX.value },
+        { translateY: transY.value },
+        { scale: antScale.value },
+      ],
+      zIndex: isDragging.value ? 100 : 28,
+    };
+  });
+
+  const sugarStyle = useAnimatedStyle(() => ({
+    opacity: sugarVisible.value,
+    transform: [{ scale: sugarVisible.value }],
+  }));
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <Animated.View
+        style={[{ position: "absolute", top: rowY, left: 0 }, antAnimStyle]}
+      >
+        {hasSugar && (
+          <Animated.View
+            style={[
+              {
+                position: "absolute",
+                top: -sugarPieceSize * 0.6,
+                left: antWidth / 2 - sugarPieceSize / 2,
+              },
+              sugarStyle,
+            ]}
+          >
+            <Image
+              source={ANT_IMAGES.sugarBreak2}
+              style={{ width: sugarPieceSize, height: sugarPieceSize }}
+              contentFit="contain"
+            />
+          </Animated.View>
+        )}
+        <Image
+          source={ANT_IMAGES.ant}
+          style={{ width: antWidth, height: antHeight }}
+          contentFit="contain"
+        />
+      </Animated.View>
+    </GestureDetector>
+  );
+}
 
 export default function AntCharacter({
   sw,
@@ -42,147 +184,57 @@ export default function AntCharacter({
 }: AntCharacterProps) {
   const antWidth = sugarSize * 0.45;
   const antHeight = antWidth * 0.7;
-  const sugarPieceSize = sugarSize; // เท่ากับ sugar_break1 ที่แสดงด้านบน (pieceDisplaySize)
-
-  // แถวมดเริ่มจากตำแหน่งที่ส่งมาจาก SugarRoll
+  const sugarPieceSize = sugarSize;
   const rowY = initialY ?? sh * 0.65;
 
-  // ---- ขบวนมดเดิน (shared value สำหรับ offset ทั้งแถว) ----
-  const marchOffset = useSharedValue(0);
-  const totalWidth = ANT_COUNT * sw * ANT_SPACING + antWidth;
+  const spacing = sw * ANT_SPACING;
+  const range = sw + antWidth; // ระยะ 1 รอบของแต่ละมด
+
+  // ─── แต่ละมดมี SharedValue ของตัวเอง → loop อิสระ ───
+  // (ไม่ใส่ใน loop เพื่อ React Compiler)
+  const o0 = useSharedValue(0);
+  const o1 = useSharedValue(0);
+  const o2 = useSharedValue(0);
+  const o3 = useSharedValue(0);
+  const o4 = useSharedValue(0);
+  const o5 = useSharedValue(0);
+  const o6 = useSharedValue(0);
+  const o7 = useSharedValue(0);
+  const o8 = useSharedValue(0);
+  const o9 = useSharedValue(0);
+  const allOffsets = [o0, o1, o2, o3, o4, o5, o6, o7, o8, o9];
 
   useEffect(() => {
-    // เดินจากขวาไปซ้าย วนลูปไม่มีจบ
-    marchOffset.value = 0;
-    marchOffset.value = withRepeat(
-      withTiming(-totalWidth, { duration: 12000 }),
-      -1,
-      false,
-    );
-  }, [totalWidth]);
+    // ant 0 เริ่มที่ตำแหน่งเดียวกับที่ intro จบ (initialX)
+    // getMarchX(val) = (sw + val) % range = initialX  →  val = initialX - sw
+    const ant0Phase = (initialX ?? sw * 0.65) - sw;
 
-  // ---- sugar piece บนหัวมดตัวที่ 1 (ลากได้) ----
-  const sugarTransX = useSharedValue(0);
-  const sugarTransY = useSharedValue(0);
-  const ctxX = useSharedValue(0);
-  const ctxY = useSharedValue(0);
-  const sugarScale = useSharedValue(1);
-  const sugarOpacity = useSharedValue(1);
-  const isDragging = useSharedValue(false);
-
-  useEffect(() => {
-    sugarTransX.value = 0;
-    sugarTransY.value = 0;
-  }, [initialX, initialY]);
-
-  const handleReturnSugar = () => {
-    onReturnSugar();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  const checkSugarSnap = () => {
-    // คำนวณตำแหน่งจริงของ sugar piece
-    const baseX = (initialX ?? sw * 0.5) + sugarTransX.value;
-    const baseY = rowY - sugarPieceSize * 0.6 + sugarTransY.value;
-    const cx = baseX + sugarPieceSize / 2;
-    const cy = baseY + sugarPieceSize / 2;
-    const dx = cx - sugarTargetX;
-    const dy = cy - sugarTargetY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < sugarSize * 0.6) {
-      const snapX = sugarTargetX - sugarPieceSize / 2 - (initialX ?? sw * 0.5);
-      const snapY = sugarTargetY - sugarPieceSize / 2 - (rowY - sugarPieceSize * 0.6);
-      sugarTransX.value = withTiming(snapX, { duration: 200 });
-      sugarTransY.value = withTiming(snapY, { duration: 200 });
-      sugarScale.value = withTiming(0, { duration: 300 });
-      sugarOpacity.value = withTiming(0, { duration: 300 });
-      runOnJS(handleReturnSugar)();
-    } else {
-      sugarScale.value = withSpring(1);
-    }
-  };
-
-  const panGesture = Gesture.Pan()
-    .enabled(isActive)
-    .onStart(() => {
-      ctxX.value = sugarTransX.value;
-      ctxY.value = sugarTransY.value;
-      isDragging.value = true;
-      sugarScale.value = withSpring(1.15);
-      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
-    })
-    .onUpdate((e) => {
-      sugarTransX.value = ctxX.value + e.translationX;
-      sugarTransY.value = ctxY.value + e.translationY;
-    })
-    .onEnd(() => {
-      isDragging.value = false;
-      runOnJS(checkSugarSnap)();
+    allOffsets.forEach((offset, i) => {
+      const initialVal = ant0Phase - i * spacing;
+      offset.value = initialVal;
+      offset.value = withRepeat(
+        withTiming(initialVal - range, {
+          duration: CYCLE_DURATION,
+          easing: Easing.linear,
+        }),
+        -1,
+        false,
+      );
     });
-
-  const sugarAnimStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: sugarTransX.value },
-      { translateY: sugarTransY.value },
-      { scale: sugarScale.value },
-    ],
-    opacity: sugarOpacity.value,
-    zIndex: isDragging.value ? 100 : 35,
-  }));
-
-  // sugar piece ตำแหน่งเริ่ม — อยู่บนหัวมดตัวแรก
-  const sugarStartX = (initialX ?? sw * 0.5) - sugarPieceSize / 2 + antWidth / 2;
-  const sugarStartY = rowY - sugarPieceSize * 0.6;
+  }, [initialX]);
 
   return (
     <>
-      {/* ขบวนมด 5 ตัว เดินต่อแถว */}
-      {Array.from({ length: ANT_COUNT }).map((_, i) => {
-        const antAnimStyle = useAnimatedStyle(() => {
-          // เริ่มจากขวาสุดของจอ แล้วเดินไปซ้าย
-          const baseX = sw + i * sw * ANT_SPACING;
-          let x = baseX + marchOffset.value;
-          // วนจอ — หลุดซ้ายให้โผล่ขวา
-          const wrapWidth = sw + totalWidth;
-          x = ((x % wrapWidth) + wrapWidth) % wrapWidth - antWidth;
-          return {
-            transform: [{ translateX: x }],
-          };
-        });
-
-        return (
-          <Animated.View
-            key={`ant-${i}`}
-            style={[
-              { position: "absolute", top: rowY, zIndex: 28 },
-              antAnimStyle,
-            ]}
-          >
-            <Image
-              source={ANT_IMAGES.ant}
-              style={{ width: antWidth, height: antHeight }}
-              contentFit="contain"
-            />
-          </Animated.View>
-        );
-      })}
-
-      {/* sugar_break2 บนหัวมดตัวที่ 1 — ลากได้ */}
-      <GestureDetector gesture={panGesture}>
-        <Animated.View
-          style={[
-            { position: "absolute", left: sugarStartX, top: sugarStartY },
-            sugarAnimStyle,
-          ]}
-        >
-          <Image
-            source={ANT_IMAGES.sugarBreak2}
-            style={{ width: sugarPieceSize, height: sugarPieceSize }}
-            contentFit="contain"
-          />
-        </Animated.View>
-      </GestureDetector>
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o0} hasSugar={true}  sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o1} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o2} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o3} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o4} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o5} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o6} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o7} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o8} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o9} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
     </>
   );
 }

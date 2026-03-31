@@ -666,14 +666,13 @@ export default function GameScreen({ config }: { config: GameConfig }) {
 
         {/* Thief character (worm / ant) — auto-navigate or static */}
         {(phase === "intro" || phase === "playing") &&
-          !pieceReturned &&
           config.renderThief && (
             <View
               style={[
                 StyleSheet.absoluteFill,
                 { opacity: phase === "playing" ? 1 : 0 },
               ]}
-              pointerEvents={phase === "playing" ? "box-none" : "none"}
+              pointerEvents={phase === "playing" && !pieceReturned ? "box-none" : "none"}
             >
               {config.renderThief({
                 sw,

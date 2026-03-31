@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
 import Animated, {
+  type SharedValue,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -17,6 +18,44 @@ import {
   SFX_SOUNDS,
   calculateSlotPositions,
 } from "../../utils/gameConfig";
+
+// ─── แยก component ตัวอักษร (หลีกเลี่ยง hook ใน .map) ───
+function IntroLetter({
+  char,
+  size,
+  x,
+  y,
+  scale,
+  rotation,
+  opacity,
+}: {
+  char: string;
+  size: number;
+  x: SharedValue<number>;
+  y: SharedValue<number>;
+  scale: SharedValue<number>;
+  rotation: SharedValue<number>;
+  opacity: SharedValue<number>;
+}) {
+  const lStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: x.value },
+      { translateY: y.value },
+      { scale: scale.value },
+      { rotate: `${rotation.value}deg` },
+    ],
+    opacity: opacity.value,
+  }));
+  return (
+    <Animated.View style={[styles.letter, lStyle]}>
+      <Image
+        source={LETTER_IMAGES[char]}
+        style={{ width: size, height: size }}
+        contentFit="contain"
+      />
+    </Animated.View>
+  );
+}
 
 interface SugarRollProps {
   sw: number;
@@ -70,19 +109,24 @@ export default function SugarRoll({
   const break2Opacity = useSharedValue(0);
 
   // ---- Letters ----
-  const letterX = ANT_LETTERS.map((_, i) => useSharedValue(slotPositions[i]?.x ?? 0));
-  const letterY = ANT_LETTERS.map((_, i) => useSharedValue(slotPositions[i]?.y ?? 0));
+  const letterX = ANT_LETTERS.map((_, i) =>
+    useSharedValue(slotPositions[i]?.x ?? 0),
+  );
+  const letterY = ANT_LETTERS.map((_, i) =>
+    useSharedValue(slotPositions[i]?.y ?? 0),
+  );
   const letterOpacities = ANT_LETTERS.map(() => useSharedValue(1));
   const letterScales = ANT_LETTERS.map(() => useSharedValue(1));
   const letterRotations = ANT_LETTERS.map(() => useSharedValue(0));
 
   // ---- Ant ----
-  const antFinalX = useRef(sw * 0.65).current; // ตำแหน่งแถวมด (ขวา)
-  const antFinalY = useRef(sh * 0.6).current;
+  const antFinalX = useRef(sw * 0.7).current; // ตำแหน่งแถวมด (ขวา)
+  const antFinalY = useRef(sh * 0.8).current;
   const antX = useSharedValue(sw * 0.5);
   const antY = useSharedValue(sh * 0.85);
   const antOpacity = useSharedValue(0);
   const antScale = useSharedValue(0.8);
+  const antCarryingShared = useSharedValue(0); // 0 = ยังไม่แบก, 1 = แบกแล้ว
 
   useEffect(() => {
     if (onAntPosition) onAntPosition(antFinalX, antFinalY);
@@ -139,7 +183,10 @@ export default function SugarRoll({
     const sugarCenterY = sugarLandY - sugarSize / 2;
     break2X.value = sugarCenterX;
     break2Y.value = sugarCenterY;
-    break2Opacity.value = withDelay(crackDone, withTiming(1, { duration: 100 }));
+    break2Opacity.value = withDelay(
+      crackDone,
+      withTiming(1, { duration: 100 }),
+    );
 
     // ตัวอักษรกระเด็น
     ANT_LETTERS.forEach((_, i) => {
@@ -174,24 +221,60 @@ export default function SugarRoll({
       letterX[i].value = withDelay(
         impactTime + i * 50,
         withSequence(
-          withTiming(impactX, { duration: 140, easing: Easing.in(Easing.quad) }),
-          withTiming(b1LandX, { duration: 450, easing: Easing.out(Easing.quad) }),
-          withTiming(b2LandX, { duration: 360, easing: Easing.in(Easing.quad) }),
-          withTiming(b3MidX, { duration: 320, easing: Easing.out(Easing.quad) }),
-          withTiming(b3MidX + (tx - b3MidX) * 0.4, { duration: 250, easing: Easing.in(Easing.quad) }),
-          withTiming(tx + (Math.random() - 0.5) * 15, { duration: 180, easing: Easing.out(Easing.quad) }),
+          withTiming(impactX, {
+            duration: 140,
+            easing: Easing.in(Easing.quad),
+          }),
+          withTiming(b1LandX, {
+            duration: 450,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(b2LandX, {
+            duration: 360,
+            easing: Easing.in(Easing.quad),
+          }),
+          withTiming(b3MidX, {
+            duration: 320,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(b3MidX + (tx - b3MidX) * 0.4, {
+            duration: 250,
+            easing: Easing.in(Easing.quad),
+          }),
+          withTiming(tx + (Math.random() - 0.5) * 15, {
+            duration: 180,
+            easing: Easing.out(Easing.quad),
+          }),
           withTiming(tx, { duration: 100 }),
         ),
       );
       letterY[i].value = withDelay(
         impactTime + i * 50,
         withSequence(
-          withTiming(impactY, { duration: 140, easing: Easing.in(Easing.quad) }),
-          withTiming(b1PeakY, { duration: 450, easing: Easing.out(Easing.quad) }),
-          withTiming(b2LandY, { duration: 360, easing: Easing.in(Easing.quad) }),
-          withTiming(b2PeakY, { duration: 320, easing: Easing.out(Easing.quad) }),
-          withTiming(ty + sh * 0.02, { duration: 250, easing: Easing.in(Easing.quad) }),
-          withTiming(b3PeakY, { duration: 180, easing: Easing.out(Easing.quad) }),
+          withTiming(impactY, {
+            duration: 140,
+            easing: Easing.in(Easing.quad),
+          }),
+          withTiming(b1PeakY, {
+            duration: 450,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(b2LandY, {
+            duration: 360,
+            easing: Easing.in(Easing.quad),
+          }),
+          withTiming(b2PeakY, {
+            duration: 320,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(ty + sh * 0.02, {
+            duration: 250,
+            easing: Easing.in(Easing.quad),
+          }),
+          withTiming(b3PeakY, {
+            duration: 180,
+            easing: Easing.out(Easing.quad),
+          }),
           withTiming(ty, { duration: 100 }),
         ),
       );
@@ -209,31 +292,34 @@ export default function SugarRoll({
       );
     });
 
-    // ========== Phase 3: มดโผล่ → เดินไปหาน้ำตาล → แบก → กลับแถว ==========
+    // ========== Phase 3: มดโผล่จากนอกจอ → เดินไปหาน้ำตาล → แบก → กลับแถว ==========
     const antAppearTime = crackDone + 200;
     const antWalkToSugar = 1200;
     const antAtSugar = antAppearTime + antWalkToSugar;
     const antPickupDuration = 400;
     const antWalkBack = 1000;
 
-    // ตำแหน่งที่มดจะไปถึง (ใต้น้ำตาล)
+    // มดเดินมาถึงตำแหน่งน้ำตาล (น้ำตาลอยู่กับที่ มดเดินมาหา)
     const antAtSugarX = sugarCenterX + break2Size / 2 - antSize / 2;
     const antAtSugarY = sugarCenterY + break2Size * 0.5;
 
-    // ตำแหน่ง break2 ย่อลงบนหัวมด (ขณะอยู่ที่น้ำตาล)
-    const break2OnAntX = antAtSugarX + antSize / 2 - (break2Size * 0.35) / 2;
-    const break2OnAntY = antAtSugarY - break2Size * 0.35 * 0.8;
+    // break2 บนหัวมด ขณะอยู่ที่น้ำตาล
+    const break2OnAntX = antAtSugarX + antSize / 2 - break2Size / 2;
+    const break2OnAntY = antAtSugarY - break2Size * 0.5;
 
-    // ตำแหน่ง break2 ตามมดไปที่แถว
-    const break2FinalX = antFinalX + antSize / 2 - (break2Size * 0.35) / 2;
-    const break2FinalY = antFinalY - break2Size * 0.35 * 0.6;
+    // break2 ตามมดกลับแถว
+    const break2FinalX = antFinalX + antSize / 2 - break2Size / 2;
+    const break2FinalY = antFinalY - break2Size * 0.5;
 
-    antOpacity.value = withDelay(antAppearTime, withTiming(1, { duration: 300 }));
+    antOpacity.value = withDelay(
+      antAppearTime,
+      withTiming(1, { duration: 300 }),
+    );
     antScale.value = withDelay(antAppearTime, withSpring(1, { damping: 12 }));
 
-    // มดเดินจากล่าง → ไปที่น้ำตาล → กลับแถว (ครบจบใน withSequence เดียว)
+    // มดเริ่มนอกจอด้านล่าง → เดินไปหาน้ำตาล → รอหยิบ → กลับแถว
     antX.value = sw * 0.5 - antSize / 2;
-    antY.value = sh * 0.85;
+    antY.value = sh + antSize;
     antX.value = withDelay(
       antAppearTime,
       withSequence(
@@ -241,7 +327,6 @@ export default function SugarRoll({
           duration: antWalkToSugar,
           easing: Easing.inOut(Easing.quad),
         }),
-        // รอหยิบ sugar
         withTiming(antAtSugarX, { duration: antPickupDuration }),
         withTiming(antFinalX, {
           duration: antWalkBack,
@@ -256,7 +341,6 @@ export default function SugarRoll({
           duration: antWalkToSugar,
           easing: Easing.inOut(Easing.quad),
         }),
-        // รอหยิบ sugar
         withTiming(antAtSugarY, { duration: antPickupDuration }),
         withTiming(antFinalY, {
           duration: antWalkBack,
@@ -265,33 +349,13 @@ export default function SugarRoll({
       ),
     );
 
-    // ========== Phase 4: มดถึงน้ำตาล → แบก sugar_break2 → ตามมดกลับแถว ==========
+    // ========== Phase 4: มดถึงน้ำตาล → แบก sugar_break2 (ติดตามมดโดยตรง) ==========
     setTimeout(() => setAntCarrying(true), antAtSugar);
 
-    // sugar_break2 ย่อลง + ลอยขึ้นไปบนหัวมด → ตามมดกลับแถว
-    break2Scale.value = withDelay(
+    // เปลี่ยน antCarryingShared → break2 จะ follow ant ผ่าน useAnimatedStyle
+    antCarryingShared.value = withDelay(
       antAtSugar,
-      withTiming(0.35, { duration: antPickupDuration }),
-    );
-    break2X.value = withDelay(
-      antAtSugar,
-      withSequence(
-        withTiming(break2OnAntX, { duration: antPickupDuration }),
-        withTiming(break2FinalX, {
-          duration: antWalkBack,
-          easing: Easing.out(Easing.quad),
-        }),
-      ),
-    );
-    break2Y.value = withDelay(
-      antAtSugar,
-      withSequence(
-        withTiming(break2OnAntY, { duration: antPickupDuration }),
-        withTiming(break2FinalY, {
-          duration: antWalkBack,
-          easing: Easing.out(Easing.quad),
-        }),
-      ),
+      withTiming(1, { duration: antPickupDuration }),
     );
 
     // ========== Intro complete ==========
@@ -306,12 +370,18 @@ export default function SugarRoll({
   // Sugar image
   const sugarImage = (() => {
     switch (sugarFrame) {
-      case 0: return ANT_IMAGES.sugar;
-      case 1: return ANT_IMAGES.sprite1;
-      case 2: return ANT_IMAGES.sprite2;
-      case 3: return ANT_IMAGES.sprite3;
-      case 4: return ANT_IMAGES.sprite4;
-      default: return ANT_IMAGES.sugarBreak1;
+      case 0:
+        return ANT_IMAGES.sugar;
+      case 1:
+        return ANT_IMAGES.sprite1;
+      case 2:
+        return ANT_IMAGES.sprite2;
+      case 3:
+        return ANT_IMAGES.sprite3;
+      case 4:
+        return ANT_IMAGES.sprite4;
+      default:
+        return ANT_IMAGES.sugarBreak1;
     }
   })();
 
@@ -324,14 +394,20 @@ export default function SugarRoll({
     ],
   }));
 
-  const break2Style = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: break2X.value },
-      { translateY: break2Y.value },
-      { scale: break2Scale.value },
-    ],
-    opacity: break2Opacity.value,
-  }));
+  const break2Style = useAnimatedStyle(() => {
+    const carry = antCarryingShared.value;
+    // ตำแหน่งบนหัวมด (ติดตาม ant โดยตรง)
+    const followX = antX.value + antSize / 2 - break2Size / 2;
+    const followY = antY.value - break2Size * 0.5;
+    return {
+      transform: [
+        { translateX: break2X.value * (1 - carry) + followX * carry },
+        { translateY: break2Y.value * (1 - carry) + followY * carry },
+        { scale: break2Scale.value },
+      ],
+      opacity: break2Opacity.value,
+    };
+  });
 
   const antAnimStyle = useAnimatedStyle(() => ({
     transform: [
@@ -345,26 +421,18 @@ export default function SugarRoll({
   return (
     <>
       {/* ตัวอักษร */}
-      {ANT_LETTERS.map((letter, i) => {
-        const lStyle = useAnimatedStyle(() => ({
-          transform: [
-            { translateX: letterX[i].value },
-            { translateY: letterY[i].value },
-            { scale: letterScales[i].value },
-            { rotate: `${letterRotations[i].value}deg` },
-          ],
-          opacity: letterOpacities[i].value,
-        }));
-        return (
-          <Animated.View key={`intro-${letter.char}-${i}`} style={[styles.letter, lStyle]}>
-            <Image
-              source={LETTER_IMAGES[letter.char]}
-              style={{ width: letterSize, height: letterSize }}
-              contentFit="contain"
-            />
-          </Animated.View>
-        );
-      })}
+      {ANT_LETTERS.map((letter, i) => (
+        <IntroLetter
+          key={`intro-${letter.char}-${i}`}
+          char={letter.char}
+          size={letterSize}
+          x={letterX[i]}
+          y={letterY[i]}
+          scale={letterScales[i]}
+          rotation={letterRotations[i]}
+          opacity={letterOpacities[i]}
+        />
+      ))}
 
       {/* ก้อนน้ำตาลหลัก — ตก → crack → sugar_break1 */}
       <Animated.View style={[styles.sugar, sugarStyle]}>
