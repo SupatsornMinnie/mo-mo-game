@@ -27,16 +27,16 @@ interface AntCharacterProps {
 }
 
 const ANT_COUNT = 10;
-const ANT_SPACING = 0.1; // ** ระยะห่างระหว่างมดแต่ละตัว (% ของหน้าจอ)
-const CYCLE_DURATION = 5000; // ** ความเร็วมด: ลด = เร็ว, เพิ่ม = ช้า (ms/รอบ)
+const ANT_SPACING = 0.1;
+const CYCLE_DURATION = 8000; // ** ความเร็วมด: ลด = เร็ว, เพิ่ม = ช้า
 
-// ─── มดลากได้แต่ละตัว — แต่ละตัวมี offset อิสระ loop เอง ───
 function DraggableMarchingAnt({
   sw,
   antWidth,
   antHeight,
   rowY,
   marchOffset,
+  range,
   hasSugar,
   sugarPieceSize,
   sugarTargetX,
@@ -50,6 +50,7 @@ function DraggableMarchingAnt({
   antHeight: number;
   rowY: number;
   marchOffset: SharedValue<number>;
+  range: number;
   hasSugar: boolean;
   sugarPieceSize: number;
   sugarTargetX: number;
@@ -58,18 +59,23 @@ function DraggableMarchingAnt({
   onSnapSugar: () => void;
   isActive: boolean;
 }) {
-  const transX = useSharedValue(0);
-  const transY = useSharedValue(0);
-  const ctxX = useSharedValue(0);
-  const ctxY = useSharedValue(0);
+  // Ant drag (มดที่ไม่มีน้ำตาล)
+  const antTransX = useSharedValue(0);
+  const antTransY = useSharedValue(0);
+  const antCtxX = useSharedValue(0);
+  const antCtxY = useSharedValue(0);
   const antScale = useSharedValue(1);
-  const isDragging = useSharedValue(false);
-  const sugarVisible = useSharedValue(1);
 
-  // แต่ละมดวน loop อิสระ: หลุดซ้ายปั๊บ → โผล่ขวาทันที
+  // Sugar drag (เฉพาะมดตัวที่แบกน้ำตาล)
+  const sugarTransX = useSharedValue(0);
+  const sugarTransY = useSharedValue(0);
+  const sugarCtxX = useSharedValue(0);
+  const sugarCtxY = useSharedValue(0);
+  const sugarVisible = useSharedValue(1);
+  const dragStartMarchX = useSharedValue(0);
+
   const getMarchX = (offset: number) => {
     "worklet";
-    const range = sw + antWidth;
     let x = sw + offset;
     x = ((x % range) + range) % range;
     return x;
@@ -80,86 +86,103 @@ function DraggableMarchingAnt({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const checkRelease = () => {
-    if (hasSugar && sugarVisible.value > 0.5) {
-      const marchX = getMarchX(marchOffset.value);
-      const cx = marchX + transX.value + antWidth / 2;
-      const cy = rowY - sugarPieceSize * 0.1 + transY.value;
-      const dx = cx - sugarTargetX;
-      const dy = cy - sugarTargetY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist < sugarSize * 0.6) {
-        sugarVisible.value = withTiming(0, { duration: 300 });
-        transX.value = withSpring(0);
-        transY.value = withSpring(0);
-        antScale.value = withSpring(1);
-        runOnJS(handleSnap)();
-        return;
-      }
+  const checkSugarSnap = () => {
+    const marchX = getMarchX(marchOffset.value);
+    const sugarRelX = antWidth / 2 - sugarPieceSize / 2;
+    const cx = marchX + sugarRelX + sugarTransX.value + sugarPieceSize / 2;
+    const cy = rowY - sugarPieceSize * 0.6 + sugarTransY.value + sugarPieceSize / 2;
+    const dist = Math.sqrt(
+      Math.pow(cx - sugarTargetX, 2) + Math.pow(cy - sugarTargetY, 2),
+    );
+    if (dist < sugarSize * 0.6) {
+      sugarVisible.value = withTiming(0, { duration: 300 });
+      sugarTransX.value = withSpring(0);
+      sugarTransY.value = withSpring(0);
+      runOnJS(handleSnap)();
+    } else {
+      sugarTransX.value = withSpring(0);
+      sugarTransY.value = withSpring(0);
     }
-    transX.value = withSpring(0);
-    transY.value = withSpring(0);
-    antScale.value = withSpring(1);
   };
 
-  const panGesture = Gesture.Pan()
+  // Gesture น้ำตาล — ลากแยกจากมด, ชดเชยการเดินของมด
+  const sugarGesture = Gesture.Pan()
     .enabled(isActive)
     .onStart(() => {
-      ctxX.value = transX.value;
-      ctxY.value = transY.value;
-      isDragging.value = true;
+      dragStartMarchX.value = getMarchX(marchOffset.value);
+      sugarCtxX.value = sugarTransX.value;
+      sugarCtxY.value = sugarTransY.value;
+      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+    })
+    .onUpdate((e) => {
+      const marchDelta = getMarchX(marchOffset.value) - dragStartMarchX.value;
+      sugarTransX.value = sugarCtxX.value + e.translationX - marchDelta;
+      sugarTransY.value = sugarCtxY.value + e.translationY;
+    })
+    .onEnd(() => {
+      runOnJS(checkSugarSnap)();
+    });
+
+  // Gesture มดปกติ (ลากแล้วกลับแถว)
+  const antGesture = Gesture.Pan()
+    .enabled(!hasSugar && isActive)
+    .onStart(() => {
+      antCtxX.value = antTransX.value;
+      antCtxY.value = antTransY.value;
       antScale.value = withSpring(1.15);
       runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
     })
     .onUpdate((e) => {
-      transX.value = ctxX.value + e.translationX;
-      transY.value = ctxY.value + e.translationY;
+      antTransX.value = antCtxX.value + e.translationX;
+      antTransY.value = antCtxY.value + e.translationY;
     })
     .onEnd(() => {
-      isDragging.value = false;
-      runOnJS(checkRelease)();
+      antTransX.value = withSpring(0);
+      antTransY.value = withSpring(0);
+      antScale.value = withSpring(1);
     });
 
-  const antAnimStyle = useAnimatedStyle(() => {
-    const marchX = getMarchX(marchOffset.value);
-    return {
-      transform: [
-        { translateX: marchX + transX.value },
-        { translateY: transY.value },
-        { scale: antScale.value },
-      ],
-      zIndex: isDragging.value ? 100 : 28,
-    };
-  });
+  const antAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: getMarchX(marchOffset.value) + antTransX.value },
+      { translateY: antTransY.value },
+      { scale: antScale.value },
+    ],
+    zIndex: 28,
+  }));
 
   const sugarStyle = useAnimatedStyle(() => ({
     opacity: sugarVisible.value,
-    transform: [{ scale: sugarVisible.value }],
+    transform: [
+      { translateX: sugarTransX.value },
+      { translateY: sugarTransY.value },
+    ],
   }));
 
   return (
-    <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={antGesture}>
       <Animated.View
         style={[{ position: "absolute", top: rowY, left: 0 }, antAnimStyle]}
       >
         {hasSugar && (
-          <Animated.View
-            style={[
-              {
-                position: "absolute",
-                top: -sugarPieceSize * 0.6,
-                left: antWidth / 2 - sugarPieceSize / 2,
-              },
-              sugarStyle,
-            ]}
-          >
-            <Image
-              source={ANT_IMAGES.sugarBreak2}
-              style={{ width: sugarPieceSize, height: sugarPieceSize }}
-              contentFit="contain"
-            />
-          </Animated.View>
+          <GestureDetector gesture={sugarGesture}>
+            <Animated.View
+              style={[
+                {
+                  position: "absolute",
+                  top: -sugarPieceSize * 0.6,
+                  left: antWidth / 2 - sugarPieceSize / 2,
+                },
+                sugarStyle,
+              ]}
+            >
+              <Image
+                source={ANT_IMAGES.sugarBreak2}
+                style={{ width: sugarPieceSize, height: sugarPieceSize }}
+                contentFit="contain"
+              />
+            </Animated.View>
+          </GestureDetector>
         )}
         <Image
           source={ANT_IMAGES.ant}
@@ -188,10 +211,9 @@ export default function AntCharacter({
   const rowY = initialY ?? sh * 0.65;
 
   const spacing = sw * ANT_SPACING;
-  const range = sw + antWidth; // ระยะ 1 รอบของแต่ละมด
+  // range ใหญ่พอรองรับขบวนมดทั้งหมด + ข้ามจอ
+  const range = sw + (ANT_COUNT - 1) * spacing + antWidth;
 
-  // ─── แต่ละมดมี SharedValue ของตัวเอง → loop อิสระ ───
-  // (ไม่ใส่ใน loop เพื่อ React Compiler)
   const o0 = useSharedValue(0);
   const o1 = useSharedValue(0);
   const o2 = useSharedValue(0);
@@ -205,15 +227,15 @@ export default function AntCharacter({
   const allOffsets = [o0, o1, o2, o3, o4, o5, o6, o7, o8, o9];
 
   useEffect(() => {
-    // ant 0 เริ่มที่ตำแหน่งเดียวกับที่ intro จบ (initialX)
-    // getMarchX(val) = (sw + val) % range = initialX  →  val = initialX - sw
+    // ant 0 = ตัวนำขบวน (ซ้ายสุด, มีน้ำตาล)
+    // ant 1-9 = ตามหลัง (ทางขวาของ ant 0)
     const ant0Phase = (initialX ?? sw * 0.65) - sw;
 
     allOffsets.forEach((offset, i) => {
-      const initialVal = ant0Phase - i * spacing;
-      offset.value = initialVal;
+      const phase = ant0Phase + i * spacing;
+      offset.value = phase;
       offset.value = withRepeat(
-        withTiming(initialVal - range, {
+        withTiming(phase - range, {
           duration: CYCLE_DURATION,
           easing: Easing.linear,
         }),
@@ -223,18 +245,32 @@ export default function AntCharacter({
     });
   }, [initialX]);
 
+  const commonProps = {
+    sw,
+    antWidth,
+    antHeight,
+    rowY,
+    range,
+    sugarPieceSize,
+    sugarTargetX,
+    sugarTargetY,
+    sugarSize,
+    onSnapSugar: onReturnSugar,
+    isActive,
+  };
+
   return (
     <>
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o0} hasSugar={true}  sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o1} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o2} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o3} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o4} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o5} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o6} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o7} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o8} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
-      <DraggableMarchingAnt sw={sw} antWidth={antWidth} antHeight={antHeight} rowY={rowY} marchOffset={o9} hasSugar={false} sugarPieceSize={sugarPieceSize} sugarTargetX={sugarTargetX} sugarTargetY={sugarTargetY} sugarSize={sugarSize} onSnapSugar={onReturnSugar} isActive={isActive} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o0} hasSugar={true} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o1} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o2} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o3} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o4} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o5} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o6} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o7} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o8} hasSugar={false} />
+      <DraggableMarchingAnt {...commonProps} marchOffset={o9} hasSugar={false} />
     </>
   );
 }
