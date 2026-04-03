@@ -120,6 +120,8 @@ export interface GameConfig {
     pieceRotation: number;
     onReturnPiece: () => void;
     isActive: boolean;
+    /** true ตลอด playing phase (ไม่หยุดหลัง piece returned) — ใช้สำหรับ walking/drag มด */
+    isWalking: boolean;
     retryKey: number;
   }) => React.ReactNode;
 }
@@ -672,7 +674,7 @@ export default function GameScreen({ config }: { config: GameConfig }) {
                 StyleSheet.absoluteFill,
                 { opacity: phase === "playing" ? 1 : 0 },
               ]}
-              pointerEvents={phase === "playing" && !pieceReturned ? "box-none" : "none"}
+              pointerEvents={phase === "playing" ? "box-none" : "none"}
             >
               {config.renderThief({
                 sw,
@@ -685,6 +687,7 @@ export default function GameScreen({ config }: { config: GameConfig }) {
                 pieceRotation: pieceRotationAngle,
                 onReturnPiece: handlePieceReturn,
                 isActive: phase === "playing" && !pieceReturned,
+                isWalking: phase === "playing",
                 retryKey,
               })}
             </View>

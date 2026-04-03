@@ -24,11 +24,13 @@ interface AntCharacterProps {
   sugarSize: number;
   onReturnSugar: () => void;
   isActive: boolean;
+  /** true ตลอด playing phase — ให้มดเดินต่อและลากได้แม้ pieceReturned แล้ว */
+  isWalking?: boolean;
 }
 
-const ANT_COUNT = 10;
+const ANT_COUNT = 8;
 const ANT_SPACING = 0.1;
-const CYCLE_DURATION = 8000; // ** ความเร็วมด: ลด = เร็ว, เพิ่ม = ช้า
+const CYCLE_DURATION = 15000; // ** ความเร็วมด: ลด = เร็ว, เพิ่ม = ช้า
 
 function DraggableMarchingAnt({
   sw,
@@ -44,6 +46,7 @@ function DraggableMarchingAnt({
   sugarSize,
   onSnapSugar,
   isActive,
+  isWalking,
 }: {
   sw: number;
   antWidth: number;
@@ -58,6 +61,7 @@ function DraggableMarchingAnt({
   sugarSize: number;
   onSnapSugar: () => void;
   isActive: boolean;
+  isWalking: boolean;
 }) {
   // Ant drag (มดที่ไม่มีน้ำตาล)
   const antTransX = useSharedValue(0);
@@ -90,7 +94,8 @@ function DraggableMarchingAnt({
     const marchX = getMarchX(marchOffset.value);
     const sugarRelX = antWidth / 2 - sugarPieceSize / 2;
     const cx = marchX + sugarRelX + sugarTransX.value + sugarPieceSize / 2;
-    const cy = rowY - sugarPieceSize * 0.6 + sugarTransY.value + sugarPieceSize / 2;
+    const cy =
+      rowY - sugarPieceSize * 0.6 + sugarTransY.value + sugarPieceSize / 2;
     const dist = Math.sqrt(
       Math.pow(cx - sugarTargetX, 2) + Math.pow(cy - sugarTargetY, 2),
     );
@@ -125,7 +130,7 @@ function DraggableMarchingAnt({
 
   // Gesture มดปกติ (ลากแล้วกลับแถว)
   const antGesture = Gesture.Pan()
-    .enabled(!hasSugar && isActive)
+    .enabled(!hasSugar && isWalking)
     .onStart(() => {
       antCtxX.value = antTransX.value;
       antCtxY.value = antTransY.value;
@@ -137,9 +142,16 @@ function DraggableMarchingAnt({
       antTransY.value = antCtxY.value + e.translationY;
     })
     .onEnd(() => {
-      antTransX.value = withSpring(0);
-      antTransY.value = withSpring(0);
-      antScale.value = withSpring(1);
+      // กลับแถวช้าๆ นิ่มนวล
+      antTransX.value = withTiming(0, {
+        duration: 700,
+        easing: Easing.out(Easing.quad),
+      });
+      antTransY.value = withTiming(0, {
+        duration: 700,
+        easing: Easing.out(Easing.quad),
+      });
+      antScale.value = withTiming(1, { duration: 400 });
     });
 
   const antAnimStyle = useAnimatedStyle(() => ({
@@ -204,7 +216,9 @@ export default function AntCharacter({
   sugarSize,
   onReturnSugar,
   isActive,
+  isWalking: isWalkingProp,
 }: AntCharacterProps) {
+  const isWalking = isWalkingProp ?? isActive;
   const antWidth = sugarSize * 0.45;
   const antHeight = antWidth * 0.7;
   const sugarPieceSize = sugarSize;
@@ -219,17 +233,20 @@ export default function AntCharacter({
   const o2 = useSharedValue(0);
   const o3 = useSharedValue(0);
   const o4 = useSharedValue(0);
-  const o5 = useSharedValue(0);
-  const o6 = useSharedValue(0);
-  const o7 = useSharedValue(0);
-  const o8 = useSharedValue(0);
-  const o9 = useSharedValue(0);
-  const allOffsets = [o0, o1, o2, o3, o4, o5, o6, o7, o8, o9];
+  const allOffsets = [o0, o1, o2, o3, o4];
 
   useEffect(() => {
     // ant 0 = ตัวนำขบวน (ซ้ายสุด, มีน้ำตาล)
-    // ant 1-9 = ตามหลัง (ทางขวาของ ant 0)
+    // ant 1-4 = ตามหลัง (ทางขวาของ ant 0)
     const ant0Phase = (initialX ?? sw * 0.65) - sw;
+
+    if (!isWalking) {
+      // ยังไม่ playing: set ตำแหน่งเริ่มต้นไว้รอ ไม่เริ่ม animate
+      allOffsets.forEach((offset, i) => {
+        offset.value = ant0Phase + i * spacing;
+      });
+      return;
+    }
 
     allOffsets.forEach((offset, i) => {
       const phase = ant0Phase + i * spacing;
@@ -243,7 +260,7 @@ export default function AntCharacter({
         false,
       );
     });
-  }, [initialX]);
+  }, [initialX, isWalking]);
 
   const commonProps = {
     sw,
@@ -257,20 +274,32 @@ export default function AntCharacter({
     sugarSize,
     onSnapSugar: onReturnSugar,
     isActive,
+    isWalking,
   };
 
   return (
     <>
       <DraggableMarchingAnt {...commonProps} marchOffset={o0} hasSugar={true} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o1} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o2} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o3} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o4} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o5} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o6} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o7} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o8} hasSugar={false} />
-      <DraggableMarchingAnt {...commonProps} marchOffset={o9} hasSugar={false} />
+      <DraggableMarchingAnt
+        {...commonProps}
+        marchOffset={o1}
+        hasSugar={false}
+      />
+      <DraggableMarchingAnt
+        {...commonProps}
+        marchOffset={o2}
+        hasSugar={false}
+      />
+      <DraggableMarchingAnt
+        {...commonProps}
+        marchOffset={o3}
+        hasSugar={false}
+      />
+      <DraggableMarchingAnt
+        {...commonProps}
+        marchOffset={o4}
+        hasSugar={false}
+      />
     </>
   );
 }

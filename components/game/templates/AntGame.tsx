@@ -44,6 +44,7 @@ export default function AntGame({ vocab }: { vocab: VocabItem }) {
         sugarSize={props.pieceSize}
         onReturnSugar={props.onReturnPiece}
         isActive={props.isActive}
+        isWalking={props.isWalking}
       />
     ),
 
