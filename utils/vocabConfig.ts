@@ -1,7 +1,7 @@
 // ===== Vocabulary Config =====
 // เพิ่มคำศัพท์ตรงนี้ได้เรื่อยๆ รองรับได้หลายพันคำ
 
-export type GameType = 'apple' | 'ant' | 'letter-drag';
+export type GameType = 'apple' | 'ant' | 'actor' | 'letter-drag';
 
 export interface VocabItem {
   id: number;
@@ -29,13 +29,13 @@ export const VOCAB_LIST: VocabItem[] = [
     route:    '/games/2',
     gameType: 'ant',
   },
+  {
+    id: 3,
+    word: 'Actor',
+    card:     require('../assets/vocabulary/3actor/actor.webp'),
+    bubble:   require('../assets/vocabulary/3actor/bubble_actor.webp'),
+    route:    '/games/3',
+    gameType: 'actor',
+  },
   // ===== เพิ่มคำต่อไปตรงนี้ =====
-  // {
-  //   id: 3,
-  //   word: 'Actor',
-  //   card:     require('../assets/vocabulary/3actor/actor_card.webp'),
-  //   bubble:   require('../assets/vocabulary/3actor/bubble_actor.webp'),
-  //   route:    '/games/3',
-  //   gameType: 'letter-drag',
-  // },
 ];

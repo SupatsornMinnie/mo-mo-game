@@ -61,7 +61,7 @@ const VOCAB_BUBBLES = [
     word: "Actor",
     image: require("../assets/vocabulary/3actor/bubble_actor.webp"),
     locked: false,
-    hasGame: false,
+    hasGame: true,
   },
   {
     id: 4,

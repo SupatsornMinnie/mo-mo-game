@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { VOCAB_LIST } from '../../utils/vocabConfig';
 import AppleGame from '../../components/game/templates/AppleGame';
 import AntGame from '../../components/game/templates/AntGame';
+import ActorGame from '../../components/game/templates/ActorGame';
 
 export default function GameById() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,6 +19,7 @@ export default function GameById() {
 
   if (vocab.gameType === 'apple') return <AppleGame vocab={vocab} />;
   if (vocab.gameType === 'ant') return <AntGame vocab={vocab} />;
+  if (vocab.gameType === 'actor') return <ActorGame vocab={vocab} />;
 
   // TODO: เพิ่ม gameType อื่นๆ ตรงนี้
 

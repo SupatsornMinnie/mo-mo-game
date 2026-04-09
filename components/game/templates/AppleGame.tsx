@@ -2,14 +2,26 @@ import React from "react";
 import GameScreen, { type GameConfig } from "../GameScreen";
 import AppleDrop from "../AppleDrop";
 import WormCharacter from "../WormCharacter";
-import { APPLE_LETTERS, GAME_IMAGES } from "../../../utils/gameConfig";
+import { APPLE_LETTERS, GAME_IMAGES, type LetterData } from "../../../utils/gameConfig";
 import { type VocabItem } from "../../../utils/vocabConfig";
 
-export default function AppleGame({ vocab }: { vocab: VocabItem }) {
+interface AppleGameProps {
+  vocab: VocabItem;
+  /** override ตัวอักษร — default = APPLE_LETTERS */
+  letters?: LetterData[];
+  /** override key สำหรับ celebration overlay — default = ["A","P","P2","L","E"] */
+  celebrationLetterKeys?: string[];
+}
+
+export default function AppleGame({
+  vocab,
+  letters = APPLE_LETTERS,
+  celebrationLetterKeys = ["A", "P", "P2", "L", "E"],
+}: AppleGameProps) {
   const config: GameConfig = {
     id: vocab.id,
     word: vocab.word,
-    letters: APPLE_LETTERS,
+    letters,
     bgImage: GAME_IMAGES.bg,
 
     renderIntro: (props) => (
@@ -48,7 +60,7 @@ export default function AppleGame({ vocab }: { vocab: VocabItem }) {
     ),
 
     celebrationImage: GAME_IMAGES.apple,
-    celebrationLetterKeys: ["A", "P", "P2", "L", "E"],
+    celebrationLetterKeys,
   };
 
   return <GameScreen config={config} />;

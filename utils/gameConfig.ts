@@ -23,6 +23,14 @@ export const APPLE_LETTERS: LetterData[] = [
   { char: "E", index: 4 },
 ];
 
+export const ACTOR_LETTERS: LetterData[] = [
+  { char: "A", index: 0 },
+  { char: "C", index: 1 },
+  { char: "T", index: 2 },
+  { char: "O", index: 3 },
+  { char: "R", index: 4 },
+];
+
 // ===== Asset Maps (all from vocabulary/1apple/) =====
 export const LETTER_IMAGES: Record<string, any> = {
   A: require("../assets/alphabet/A/A.webp"),
