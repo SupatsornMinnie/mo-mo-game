@@ -16,6 +16,22 @@
 
 ---
 
+## Commands
+
+```bash
+npm install        # ติดตั้ง dependencies
+npm start          # expo start — dev server + QR สำหรับ Expo Go
+npm run android    # build & run บน Android (expo run:android)
+npm run ios        # build & run บน iOS (expo run:ios)
+npm run web        # รันบน browser (expo start --web)
+npm run lint       # expo lint (ESLint flat config, eslint-config-expo)
+```
+
+- **ไม่มี test framework** — มีแค่ lint กับ type-check (`npx tsc --noEmit`) เป็น automated check
+- `npm run reset-project` ย้าย starter code ไป `app-example/` (ไม่ต้องใช้ในโปรเจกต์นี้)
+
+---
+
 ## โครงสร้างไฟล์
 
 ```
@@ -81,10 +97,14 @@ styles/
 ทุกเกมใช้ **GameScreen** เป็น engine กลาง รับ `GameConfig` object:
 
 ```ts
-// games/[id].tsx
+// games/[id].tsx — dispatch ตาม gameType
 if (vocab.gameType === 'apple') return <AppleGame vocab={vocab} />;
 if (vocab.gameType === 'ant')   return <AntGame vocab={vocab} />;
+if (vocab.gameType === 'actor') return <ActorGame vocab={vocab} />;
 ```
+
+> `GameType` ปัจจุบัน (`utils/vocabConfig.ts`): `'apple' | 'ant' | 'actor' | 'letter-drag'`
+> โดย `letter-drag` ยังไม่มี template (จะ fallback เป็น "Coming soon")
 
 ```ts
 // GameConfig interface (GameScreen.tsx)
